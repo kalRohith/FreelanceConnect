@@ -33,41 +33,56 @@ const GET_USER_BY_TOKEN = gql`
 
 function MainWrapper({ token }) {
 
-  const { data } = useQuery(GET_USER_BY_TOKEN, {
+  const { data, loading, error } = useQuery(GET_USER_BY_TOKEN, {
     variables: { token: token },
+    errorPolicy: 'all', // This allows the query to return partial data even if there's an error
   });
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="App" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  // If there's an error or no data, still render the app but without user context
+  // This allows the app to function even if the token is invalid
+  if (error || !data || !data.getUserByToken) {
+    // Token might be invalid, redirect to login
+    Cookies.remove('token');
+    window.location.href = '/login';
+    return null;
+  }
 
   return (
     <div className="App">
-      {
-        data && (
-          <UserContext.Provider value={{
-            token: token,
-            userId: data.getUserByToken._id,
-            username: data.getUserByToken.username,
-            profilePicture: data.getUserByToken.profile_picture,
-          }}>
-            <BrowserRouter>
-              <React.Fragment>
-                <MainNavigation />
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route exact path="/home" element={<Home />} />
-                  <Route exact path='/services/:id' element={<Service />} />
-                  <Route exact path="/create-service" element={<CreateService />} />
-                  <Route exact path="/user/:id" element={<Profile />} />
-                  <Route exact path="/search/:query" element={<Search />} />
-                  <Route exact path="/create-order/:id" element={<CreateOrder />} />
-                  <Route exact path="/orders" element={<Orders />} />
-                  <Route exact path="/orders/:id" element={<Order />} />
-                  <Route exact path="/categories/:category" element={<Category />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </React.Fragment>
-            </BrowserRouter>
-          </UserContext.Provider>
-        )
-      }
+      <UserContext.Provider value={{
+        token: token,
+        userId: data.getUserByToken._id,
+        username: data.getUserByToken.username,
+        profilePicture: data.getUserByToken.profile_picture,
+      }}>
+        <BrowserRouter>
+          <React.Fragment>
+            <MainNavigation />
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route exact path="/home" element={<Home />} />
+              <Route exact path='/services/:id' element={<Service />} />
+              <Route exact path="/create-service" element={<CreateService />} />
+              <Route exact path="/user/:id" element={<Profile />} />
+              <Route exact path="/search/:query" element={<Search />} />
+              <Route exact path="/create-order/:id" element={<CreateOrder />} />
+              <Route exact path="/orders" element={<Orders />} />
+              <Route exact path="/orders/:id" element={<Order />} />
+              <Route exact path="/categories/:category" element={<Category />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </React.Fragment>
+        </BrowserRouter>
+      </UserContext.Provider>
     </div>
   );
 }

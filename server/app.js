@@ -45,8 +45,8 @@ const server = new ApolloServer({
 });
 
 connect(`mongodb+srv://
-${process.env.MONGO_ATLAS_USER}:${process.env.MONGO_ATLAS_PW}
-@cluster0.y16icjh.mongodb.net/${process.env.MONGO_ATLAS_DB}?retryWrites=true&w=majority`)
+${process.env.MONGO_ATLAS_USER}:${encodeURIComponent(process.env.MONGO_ATLAS_PW)}
+@freelanceconnect.nblezz6.mongodb.net/${process.env.MONGO_ATLAS_DB}?retryWrites=true&w=majority`)
   .then(() => {
     console.log('Connected to the database');
   })

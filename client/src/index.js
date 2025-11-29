@@ -12,6 +12,9 @@ import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 const wsLink = new GraphQLWsLink(createClient({
   url: 'ws://localhost:4000/graphql',
+  connectionParams: {},
+  shouldRetry: () => true,
+  retryAttempts: Infinity,
 }));
 
 const httpLink = createUploadLink({
@@ -37,6 +40,14 @@ const splitLink = split(
 const client = new ApolloClient({
   link: splitLink,
   cache: new InMemoryCache(),
+  defaultOptions: {
+    watchQuery: {
+      errorPolicy: 'all',
+    },
+    query: {
+      errorPolicy: 'all',
+    },
+  },
 });
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
