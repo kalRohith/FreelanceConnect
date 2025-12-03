@@ -4,7 +4,7 @@ import { v2 as cloudinary } from 'cloudinary'
 const UploadResolver = {
     Upload: GraphQLUpload,
     Mutation: {
-        uploadPhoto: async (_parent, { photo }, req) => {
+        uploadPhoto: async (_parent, { photo }, context) => {
             if (!context.isAuth) {
                 throw new Error('Unauthenticated!');
             }
@@ -34,7 +34,7 @@ const UploadResolver = {
                 return `Image could not be uploaded:${e.message}`;
             }
         },
-        singleUpload: async (parent, { file }) => {
+        singleUpload: async (parent, { file }, context) => {
             if (!context.isAuth) {
                 throw new Error('Unauthenticated!');
             }

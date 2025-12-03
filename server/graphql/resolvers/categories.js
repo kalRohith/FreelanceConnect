@@ -20,9 +20,13 @@ const CategoriesResolver = {
                 throw new Error('Unauthenticated!');
             }
 
+            // Generate url_name from category name (lowercase, replace spaces with hyphens)
+            const url_name = category.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
             const newCategory = new Category({
                 name: category.name,
                 description: category.description,
+                url_name: url_name,
             });
             try {
                 const result = await newCategory.save();

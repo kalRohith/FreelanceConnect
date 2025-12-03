@@ -30,6 +30,8 @@ type Query {
 type Mutation {
   createUser(user: UserInput): User,
   createService(service: ServiceInput): Service,
+  updateService(serviceId: ID!, service: UpdateServiceInput!, newImages: [Upload!]): Service,
+  deleteService(serviceId: ID!): Boolean!,
   createCategory(category: CategoryInput): Category,
   createReview(review: ReviewInput): Review,
   uploadPhoto(photo: String): String,
@@ -155,6 +157,14 @@ type Service {
 },
 
 input ServiceInput {
+  title: String!,
+  description: String!,
+  category: ID!,
+  price: Float!,
+  images: [String]!,
+},
+
+input UpdateServiceInput {
   title: String!,
   description: String!,
   category: ID!,

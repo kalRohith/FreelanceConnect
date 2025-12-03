@@ -8,6 +8,7 @@ import { gql, useQuery } from '@apollo/client';
 
 import MainNavigation from './components/navigation/MainNavigation';
 import CreateService from './pages/Service/CreateService';
+import EditService from './pages/Service/EditService';
 import CreateOrder from './pages/Order/CreateOrder';
 import NotFound from './pages/NotFound/NotFound';
 import Category from './pages/Category/Category';
@@ -72,6 +73,7 @@ function MainWrapper({ token }) {
               <Route exact path="/home" element={<Home />} />
               <Route exact path='/services/:id' element={<Service />} />
               <Route exact path="/create-service" element={<CreateService />} />
+              <Route exact path="/edit-service/:id" element={<EditService />} />
               <Route exact path="/user/:id" element={<Profile />} />
               <Route exact path="/search/:query" element={<Search />} />
               <Route exact path="/create-order/:id" element={<CreateOrder />} />
