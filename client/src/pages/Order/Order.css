@@ -210,3 +210,32 @@
     margin: 0;
     margin-bottom: 30px;
 }
+
+.payment-status {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+.payment-status--pending {
+    background-color: #ff9800;
+    color: #fff;
+}
+
+.payment-status--completed {
+    background-color: #4caf50;
+    color: #fff;
+}
+
+.payment-status--failed {
+    background-color: #f44336;
+    color: #fff;
+}
+
+.payment-status--refunded {
+    background-color: #9e9e9e;
+    color: #fff;
+}

@@ -15,6 +15,7 @@ import Category from './pages/Category/Category';
 import Landing from './pages/Landing/Landing';
 import Service from './pages/Service/Service';
 import Profile from './pages/Profile/Profile';
+import EditProfile from './pages/Profile/EditProfile';
 import Signup from './pages/Signup/Signup';
 import Search from './pages/Search/Search';
 import Orders from './pages/Order/Orders';
@@ -75,6 +76,7 @@ function MainWrapper({ token }) {
               <Route exact path="/create-service" element={<CreateService />} />
               <Route exact path="/edit-service/:id" element={<EditService />} />
               <Route exact path="/user/:id" element={<Profile />} />
+              <Route exact path="/profile/edit" element={<EditProfile />} />
               <Route exact path="/search/:query" element={<Search />} />
               <Route exact path="/create-order/:id" element={<CreateOrder />} />
               <Route exact path="/orders" element={<Orders />} />

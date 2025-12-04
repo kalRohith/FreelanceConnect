@@ -24,6 +24,11 @@ const orderSchema = new Schema({
         ref: 'Conversation'
     },
     price: Number,
+    description: String,
+    transaction: {
+        type: Schema.Types.ObjectId,
+        ref: 'Transaction'
+    },
     client_review: {
         type: Schema.Types.ObjectId,
         ref: 'Review'

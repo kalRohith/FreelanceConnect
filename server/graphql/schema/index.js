@@ -23,12 +23,15 @@ type Query {
   ordersByClientId(userId: ID!): [Order]!,
   ordersByFreelancerId(userId: ID!): [Order]!,
   orderById(orderId: ID!): Order!,
+  transactionsByOrderId(orderId: ID!): [Transaction]!,
+  transactionsByUserId(userId: ID!): [Transaction]!,
 
   conversationByOrderId(orderId: ID!): Conversation!,
 },
 
 type Mutation {
   createUser(user: UserInput): User,
+  updateUser(userId: ID!, user: UpdateUserInput!): User,
   createService(service: ServiceInput): Service,
   updateService(serviceId: ID!, service: UpdateServiceInput!, newImages: [Upload!]): Service,
   deleteService(serviceId: ID!): Boolean!,
@@ -143,6 +146,13 @@ input UserInput {
   # rating: Float!
 },
 
+input UpdateUserInput {
+  username: String,
+  full_name: String,
+  bio: String,
+  profile_picture: String,
+}
+
 type Service {
   _id: ID!,
   title: String!,
@@ -214,7 +224,22 @@ type Order {
   client_review: Review,
   conversation: Conversation,
   description: String,
+  transaction: Transaction,
   chat: Chat,
+},
+
+type Transaction {
+  _id: ID!,
+  order: Order!,
+  client: User!,
+  freelancer: User!,
+  amount: Float!,
+  type: String!,
+  status: String!,
+  date: String!,
+  description: String,
+  payment_method: String,
+  transaction_id: String,
 },
 
 input OrderInput {

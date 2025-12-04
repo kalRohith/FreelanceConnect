@@ -93,20 +93,6 @@ function Service() {
                         {isOwner && (
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                 <button
-                                    onClick={() => navigate(`/edit-service/${id}`)}
-                                    style={{
-                                        padding: '0.5rem 1rem',
-                                        backgroundColor: '#007bff',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '0.9rem'
-                                    }}
-                                >
-                                    Edit Service
-                                </button>
-                                <button
                                     onClick={() => setShowDeleteConfirm(true)}
                                     style={{
                                         padding: '0.5rem 1rem',
@@ -221,9 +207,9 @@ function Service() {
                     }
                 </div>
                 {
-                    isFreelancer === 'false' && userId !== data.service.freelancer._id ? (
+                    userId && userId !== data.service.freelancer._id ? (
                         <NavLink to={`/create-order/${data.service._id}`}>
-                            <button className="service-freelancer__hire-button">Hire</button>
+                            <button className="service-freelancer__hire-button">Place Order</button>
                         </NavLink>
                     ) : null
                 }

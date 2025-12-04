@@ -1,10 +1,68 @@
 import Category from '../../models/category.js';
 
+const defaultCategories = [
+    {
+        name: 'Web Development',
+        description: 'Custom websites, web applications, and frontend/backend development services',
+        url_name: 'web-development'
+    },
+    {
+        name: 'Graphic Design',
+        description: 'Logo design, branding, illustrations, and visual design services',
+        url_name: 'graphic-design'
+    },
+    {
+        name: 'Writing & Translation',
+        description: 'Content writing, copywriting, translation, and editing services',
+        url_name: 'writing-translation'
+    },
+    {
+        name: 'Digital Marketing',
+        description: 'SEO, social media marketing, email marketing, and online advertising',
+        url_name: 'digital-marketing'
+    },
+    {
+        name: 'Video & Animation',
+        description: 'Video editing, animation, motion graphics, and video production',
+        url_name: 'video-animation'
+    },
+    {
+        name: 'Music & Audio',
+        description: 'Music production, voice-over, audio editing, and sound design',
+        url_name: 'music-audio'
+    },
+    {
+        name: 'Programming & Tech',
+        description: 'Software development, mobile apps, data science, and technical consulting',
+        url_name: 'programming-tech'
+    },
+    {
+        name: 'Business',
+        description: 'Business consulting, virtual assistance, market research, and business plans',
+        url_name: 'business'
+    },
+    {
+        name: 'Photography',
+        description: 'Product photography, portrait photography, event photography, and photo editing',
+        url_name: 'photography'
+    },
+    {
+        name: 'Data Entry',
+        description: 'Data entry, data processing, transcription, and administrative support',
+        url_name: 'data-entry'
+    }
+];
+
 const CategoriesResolver = {
     Query: {
-        categories: async (_parent, args, req) => {
+        categories: async () => {
             try {
-                const categories = await Category.find();
+                let categories = await Category.find();
+
+                if (!categories.length) {
+                    categories = await Category.insertMany(defaultCategories);
+                }
+
                 return categories.map(category => {
                     return { ...category._doc, _id: category._id };
                 });

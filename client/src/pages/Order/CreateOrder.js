@@ -10,9 +10,18 @@ const validate = values => {
     const errors = {};
     if (!values.order_price) {
         errors.order_price = 'Required';
+    } else if (values.order_price <= 0) {
+        errors.order_price = 'Price must be greater than 0';
     }
     if (!values.order_deadline) {
         errors.order_deadline = 'Required';
+    } else {
+        const deadlineDate = new Date(values.order_deadline);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (deadlineDate < today) {
+            errors.order_deadline = 'Deadline must be in the future';
+        }
     }
     return errors;
 };
@@ -34,8 +43,8 @@ const GET_SERVICE = gql`
 `;
 
 const CREATE_ORDER = gql`
-    mutation CreateOrder($serviceId: ID!, $price: Float!, $deadline: String!, $freelancerId: ID!, $clientId: ID!) {
-        createOrder(order: { service: $serviceId, price: $price, deadline: $deadline, freelancer: $freelancerId, client: $clientId }) {
+    mutation CreateOrder($serviceId: ID!, $price: Float!, $deadline: String!, $description: String, $freelancerId: ID!, $clientId: ID!) {
+        createOrder(order: { service: $serviceId, price: $price, deadline: $deadline, description: $description, freelancer: $freelancerId, client: $clientId }) {
             _id
         }
     }
@@ -63,15 +72,21 @@ function CreateOrder(props) {
         initialValues: {
             order_price: serviceData ? serviceData.service.price : '',
             order_deadline: '',
+            order_description: '',
         },
         validate,
-        onChange: values => {
-            console.log(values);
-        },
+        enableReinitialize: true,
         onSubmit: values => {
-            createOrder({ variables: { serviceId: serviceId, price: values.order_price, deadline: values.order_deadline, freelancerId: serviceData.service.freelancer._id, clientId: userId } });
-
-            orderReset();
+            createOrder({ 
+                variables: { 
+                    serviceId: serviceId, 
+                    price: parseFloat(values.order_price), 
+                    deadline: values.order_deadline, 
+                    description: values.order_description || null,
+                    freelancerId: serviceData.service.freelancer._id, 
+                    clientId: userId 
+                } 
+            });
         },
     });
 
@@ -104,13 +119,36 @@ function CreateOrder(props) {
                         name="order_deadline"
                         type="date"
                         onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
                         value={formik.values.order_deadline}
+                        min={new Date().toISOString().split('T')[0]}
                     />
                     {formik.touched.order_deadline && formik.errors.order_deadline ? (
                         <p className="info__validation email__validation">{formik.errors.order_deadline}</p>
                     ) : null}
                 </div>
-                {orderLoading ? <button className='create-service__submit-button' type="submit">Loading...</button> : <button className='create-service__submit-button' type="submit">Submit</button>}
+                <div className='input__container'>
+                    <label htmlFor="order_description">Order Description (Optional)</label>
+                    <textarea
+                        id="order_description"
+                        name="order_description"
+                        rows="4"
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        value={formik.values.order_description}
+                        placeholder="Describe your requirements, special requests, or any additional details..."
+                    />
+                </div>
+                {orderError && (
+                    <p className="info__validation email__validation" style={{ marginBottom: '10px' }}>
+                        Error: {orderError.message}
+                    </p>
+                )}
+                {orderLoading ? (
+                    <button className='create-order__submit-button' type="submit" disabled>Creating Order...</button>
+                ) : (
+                    <button className='create-order__submit-button' type="submit">Place Order</button>
+                )}
             </form >
         </div >
     )

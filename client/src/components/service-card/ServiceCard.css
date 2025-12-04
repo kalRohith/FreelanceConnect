@@ -55,13 +55,21 @@
     margin: 0px 15px 0px 15px;
 }
 
+.service-card__footer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin: 20px 15px 15px 15px;
+    gap: 10px;
+}
+
 .service-card__price__wrapper{
     display: flex;
     flex-direction: row;
     align-items: baseline;
-    /* width: 100%; */
     justify-content: flex-end;
-    margin: 20px 15px 15px 15px;
+    flex: 1;
 }
 
 .service-card__price__wrapper p{
@@ -78,6 +86,33 @@
     color: #2DB67C;
 }
 
-.service-card a{
+.service-card__link {
     width: 100%;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.service-card__order-button {
+    background: linear-gradient(90deg, #2DB67C 0%, #38EF7D 100%);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+    white-space: nowrap;
+}
+
+.service-card__order-button:hover {
+    background: linear-gradient(90deg, #35d492 0%, #4bf88d 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(45, 182, 124, 0.3);
+}
+
+.service-card {
+    position: relative;
 }

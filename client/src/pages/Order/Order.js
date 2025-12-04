@@ -40,6 +40,15 @@ const GET_ORDER = gql`
             date
             deadline
             price
+            description
+            transaction {
+                _id
+                status
+                type
+                amount
+                date
+                description
+            }
         }
     }
 `;
@@ -442,6 +451,22 @@ function Order() {
                                             formatDate(new Date(data.orderById.date))
                                         }</p>
                                     </div>
+                                    {data.orderById.transaction && (
+                                        <div className='order__body__details__item'>
+                                            <p className='order__body__details__item__title'>Payment Status</p>
+                                            <p className='order__body__details__item__content'>
+                                                <span className={`payment-status payment-status--${data.orderById.transaction.status.toLowerCase()}`}>
+                                                    {data.orderById.transaction.status}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    )}
+                                    {data.orderById.description && (
+                                        <div className='order__body__details__item'>
+                                            <p className='order__body__details__item__title'>Description</p>
+                                            <p className='order__body__details__item__content'>{data.orderById.description}</p>
+                                        </div>
+                                    )}
                                 </div>
                                 {/* <div className='order__body__details__description col-xs-12'>
                                 <div className='order__body__details__item'>
