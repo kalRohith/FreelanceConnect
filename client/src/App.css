@@ -5,12 +5,32 @@
 
 .App {
     max-width: 1400px;
-    padding: 8px;
+    padding: 16px 24px;
     margin: 0 auto;
+    min-height: 100vh;
 }
 
 .unauthenticated-content__container * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+/* Modern scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #F5F7FB;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #C0C6D0;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #A8B0BC;
 }

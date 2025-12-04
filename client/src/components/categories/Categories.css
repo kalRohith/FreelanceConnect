@@ -1,7 +1,7 @@
 .categories {
     margin-top: 30px;
     margin-bottom: 60px;
-    font-family: 'Ubuntu', sans-serif;
+    font-family: Georgia, sans-serif;
 }
 
 .categories ul {
@@ -13,7 +13,7 @@
 
 .categories li {
     margin-right: 35px;
-    font-family: 'Ubuntu', sans-serif;
+    font-family: Georgia, sans-serif;
     color: #9CA4B1;
     font-size: 18px;
     user-select: none;
@@ -23,10 +23,6 @@
     cursor: pointer;
 }
 
-.categories .active {
-    /* color: #2DB67C; */
-}
-
 .categories li a {
     text-decoration: none !important;
     border-bottom: none !important;
@@ -34,7 +30,6 @@
     display: block;
     position: relative;
     padding: 0.2em 0;
-    /* color: #2DB67C; */
     overflow: hidden;
 }
 

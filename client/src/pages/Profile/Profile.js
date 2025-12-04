@@ -2,8 +2,9 @@ import React, { useContext, useState } from 'react';
 import ServiceCard from '../../components/service-card/ServiceCard';
 import { gql, useQuery, useMutation } from '@apollo/client';
 import Reviews from '../../components/reviews/Reviews';
+import Rating from '../../components/rating/Rating';
 import './Profile.css';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import defaultImage from '../../assets/images/default-user-image.png'
 import { useParams } from 'react-router-dom';
 import Cookies from 'js-cookie';
@@ -33,6 +34,8 @@ const GET_USER_BY_ID = gql`
             username
             profile_picture
             bio
+            freelance_rating
+            client_rating
         }
     }
 `;
@@ -45,7 +48,6 @@ const DELETE_SERVICE = gql`
 
 function Services(props) {
 
-    const navigate = useNavigate();
     const [deleteConfirm, setDeleteConfirm] = useState(null);
 
     const isCurrentUser = props.isCurrentUser;
@@ -108,25 +110,6 @@ function Services(props) {
                                 gap: '0.5rem',
                                 zIndex: 10
                             }}>
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        navigate(`/edit-service/${service._id}`);
-                                    }}
-                                    style={{
-                                        padding: '0.4rem 0.8rem',
-                                        backgroundColor: '#007bff',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '0.85rem',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                                    }}
-                                    title="Edit service"
-                                >
-                                    Edit
-                                </button>
                                 <button
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -241,10 +224,28 @@ function Profile() {
                             <div className="service-freelancer__avatar">
                                 <img src={data.user.profile_picture || defaultImage} alt="avatar" />
                             </div>
-                            <div className="service-freelancer__personal-info-wrapper">
-                                <h3 className="service-freelancer__name">{data.user.username}</h3>
-                                <div className="service-freelancer__level">Noob</div>
-                            </div>
+                        <div className="service-freelancer__personal-info-wrapper">
+                            <h3 className="service-freelancer__name">{data.user.username}</h3>
+                            {isFreelancer && data.user.freelance_rating > 0 && (
+                                <div className="profile-rating-container">
+                                    <Rating value={Math.floor(data.user.freelance_rating)} count={0} />
+                                    <span className="profile-rating-text">
+                                        {data.user.freelance_rating.toFixed(2)} Freelancer Rating
+                                    </span>
+                                </div>
+                            )}
+                            {!isFreelancer && data.user.client_rating > 0 && (
+                                <div className="profile-rating-container">
+                                    <Rating value={Math.floor(data.user.client_rating)} count={0} />
+                                    <span className="profile-rating-text">
+                                        {data.user.client_rating.toFixed(2)} Client Rating
+                                    </span>
+                                </div>
+                            )}
+                            {(!data.user.freelance_rating && !data.user.client_rating) && (
+                                <div className="service-freelancer__level">No ratings yet</div>
+                            )}
+                        </div>
                             {isCurrentUser &&
                                 <div className="service-freelancer__edit-profile">
                                     <Link to={`/profile/edit`}>

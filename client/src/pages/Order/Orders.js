@@ -1,8 +1,7 @@
 import React, { useContext } from 'react';
 import './Orders.css';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQuery, gql } from '@apollo/client';
-import Cookies from 'js-cookie';
 import defaultImage from '../../assets/images/default-user-image.png';
 import UserContext from '../../UserContext';
 import { formatDate } from '../../utils/FormatUtils';
@@ -55,192 +54,116 @@ const GET_ORDERS_BY_FREELANCER_ID = gql`
     }
 `;
 
-function FreelancerOrders() {
-
-    const navigate = useNavigate();
-
-    const userId = useContext(UserContext).userId
-
-    const { loading: ordersLoading, error: ordersError, data: ordersData } = useQuery(GET_ORDERS_BY_FREELANCER_ID, {
-        variables: { userId: userId },
-    });
-
-    return (
-        <div>
-            <h1 className='orders__header__title'>Orders Dashboard</h1>
-            {(ordersData && ordersData.ordersByFreelancerId.length > 0) ? (
-                <div className="orders-table__wrapper">
-                    <table className="orders-table">
-                        <thead>
-                            <tr>
-                                <th>Client</th>
-                                <th>Service</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Payment Status</th>
-                                <th>Date</th>
-                                <th>Deadline</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {
-                                ordersData.ordersByFreelancerId.map(order => (
-                                    <tr key={order._id}>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <div className="orders-table__freelancer-info">
-                                                    <img src={order.client.profile_picture ? order.client.profile_picture : defaultImage} alt={order.client.username ? order.client.username : ""} />
-                                                    <p>{order.client.username ? order.client.username : ""}</p>
-                                                </div>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <div>{order.service.title}</div>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                ${order.price}
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <span className={`order-status order-status--${order.status.toLowerCase()}`}>
-                                                    {order.status}
-                                                </span>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <span className={`payment-status payment-status--${order.transaction?.status?.toLowerCase() || 'pending'}`}>
-                                                    {order.transaction?.status || 'PENDING'}
-                                                </span>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                {order.date ? formatDate(new Date(order.date)) : 'N/A'}
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                {order.deadline ? formatDate(new Date(order.deadline)) : 'N/A'}
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            ) : (
-                <div className="orders-empty">
-                    <p>No orders found. Orders will appear here when clients place orders for your services.</p>
-                </div>
-            )}
-        </div>
-    )
-}
-
-function ClientOrders() {
-
-    const navigate = useNavigate();
-
-    const userId = useContext(UserContext).userId
-
-    const { loading: ordersLoading, error: ordersError, data: ordersData } = useQuery(GET_ORDERS_BY_CLIENT_ID, {
-        variables: { userId: userId },
-    });
-
-    return (
-        <div>
-            <h1 className='orders__header__title'>Orders Dashboard</h1>
-            {(ordersData && ordersData.ordersByClientId.length > 0) ? (
-                <div className="orders-table__wrapper">
-                    <table className="orders-table">
-                        <thead>
-                            <tr>
-                                <th>Freelancer</th>
-                                <th>Service</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Payment Status</th>
-                                <th>Date</th>
-                                <th>Deadline</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {
-                                ordersData.ordersByClientId.map(order => (
-                                    <tr key={order._id}>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <div className="orders-table__freelancer-info">
-                                                    <img src={order.freelancer.profile_picture ? order.freelancer.profile_picture : defaultImage} alt={order.freelancer.username ? order.freelancer.username : ""} />
-                                                    <p>{order.freelancer.username ? order.freelancer.username : ""}</p>
-                                                </div>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <div>{order.service.title}</div>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                ${order.price}
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <span className={`order-status order-status--${order.status.toLowerCase()}`}>
-                                                    {order.status}
-                                                </span>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                <span className={`payment-status payment-status--${order.transaction?.status?.toLowerCase() || 'pending'}`}>
-                                                    {order.transaction?.status || 'PENDING'}
-                                                </span>
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                {order.date ? formatDate(new Date(order.date)) : 'N/A'}
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            <Link to={`/orders/${order._id}`} className="orders-table__link">
-                                                {order.deadline ? formatDate(new Date(order.deadline)) : 'N/A'}
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            ) : (
-                <div className="orders-empty">
-                    <p>No orders found. Your orders will appear here once you place them.</p>
-                </div>
-            )}
-        </div>
-    )
-}
-
-
 function Orders() {
+    const userId = useContext(UserContext).userId;
 
-    const isFreelancer = Cookies.get('isFreelancer');
+    const { data: clientData } = useQuery(GET_ORDERS_BY_CLIENT_ID, {
+        variables: { userId },
+    });
+
+    const { data: freelancerData } = useQuery(GET_ORDERS_BY_FREELANCER_ID, {
+        variables: { userId },
+    });
+
+    const clientOrders = clientData?.ordersByClientId || [];
+    const freelancerOrders = freelancerData?.ordersByFreelancerId || [];
+
+    const allOrders = [
+        ...clientOrders.map(order => ({
+            ...order,
+            role: 'Client',
+            counterparty: order.freelancer,
+        })),
+        ...freelancerOrders.map(order => ({
+            ...order,
+            role: 'Freelancer',
+            counterparty: order.client,
+        })),
+    ].sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateB - dateA;
+    });
 
     return (
         <div className='orders'>
-            {isFreelancer === 'true' ? <FreelancerOrders /> : <ClientOrders />}
+            <h1 className='orders__header__title'>Orders Dashboard</h1>
+            {allOrders.length > 0 ? (
+                <div className="orders-table__wrapper">
+                    <table className="orders-table">
+                        <thead>
+                            <tr>
+                                <th>Your Role</th>
+                                <th>Counterparty</th>
+                                <th>Service</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Payment Status</th>
+                                <th>Date</th>
+                                <th>Deadline</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {allOrders.map(order => (
+                                <tr key={order._id}>
+                                    <td>{order.role}</td>
+                                    <td>
+                                        <Link to={`/orders/${order._id}`} className="orders-table__link">
+                                            <div className="orders-table__freelancer-info">
+                                                <img
+                                                    src={order.counterparty.profile_picture || defaultImage}
+                                                    alt={order.counterparty.username || ''}
+                                                />
+                                                <p>{order.counterparty.username || ''}</p>
+                                            </div>
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        <Link to={`/orders/${order._id}`} className="orders-table__link">
+                                            <div>{order.service.title}</div>
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        <Link to={`/orders/${order._id}`} className="orders-table__link">
+                                            ${order.price}
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        <Link to={`/orders/${order._id}`} className="orders-table__link">
+                                            <span className={`order-status order-status--${order.status.toLowerCase()}`}>
+                                                {order.status}
+                                            </span>
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        <Link to={`/orders/${order._id}`} className="orders-table__link">
+                                            <span className={`payment-status payment-status--${order.transaction?.status?.toLowerCase() || 'pending'}`}>
+                                                {order.transaction?.status || 'PENDING'}
+                                            </span>
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        <Link to={`/orders/${order._id}`} className="orders-table__link">
+                                            {order.date ? formatDate(new Date(order.date)) : 'N/A'}
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        <Link to={`/orders/${order._id}`} className="orders-table__link">
+                                            {order.deadline ? formatDate(new Date(order.deadline)) : 'N/A'}
+                                        </Link>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="orders-empty">
+                    <p>No orders found. Orders where you are the client or freelancer will appear here.</p>
+                </div>
+            )}
         </div>
-    )
+    );
 }
 
 export default Orders

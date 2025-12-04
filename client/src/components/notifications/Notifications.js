@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
-import './Notifications.css'
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import './Notifications.css';
 
 function Notifications({ notifications }) {
     const [show, setShow] = useState(false);
@@ -24,21 +24,52 @@ function Notifications({ notifications }) {
                         </div>
                     </div>
                     <div className="notification__body">
-                        {notifications.map((notification) => (
-                            <Link to="/messages">
-                                <div className="notification__body__item">
+                        {notifications && notifications.length > 0 ? (
+                            notifications.map((notification) => {
+                                const hasOrder = notification.order && notification.order._id;
+                                const content = (
                                     <div className="notification__body__item__content">
-                                        <p className="notification__body__item__content__message">{notification.message}</p>
-                                        <p className="notification__body__item__content__time">{notification.time}</p>
+                                        <p className="notification__body__item__content__message">
+                                            {notification.content}
+                                        </p>
+                                        <p className="notification__body__item__content__time">
+                                            {new Date(notification.date).toLocaleString()}
+                                        </p>
                                     </div>
+                                );
+
+                                if (hasOrder) {
+                                    return (
+                                        <Link
+                                            key={notification.id}
+                                            to={`/orders/${notification.order._id}`}
+                                            className="notification__body__item"
+                                        >
+                                            {content}
+                                        </Link>
+                                    );
+                                }
+
+                                return (
+                                    <div key={notification.id} className="notification__body__item">
+                                        {content}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="notification__body__item">
+                                <div className="notification__body__item__content">
+                                    <p className="notification__body__item__content__message">
+                                        No notifications yet.
+                                    </p>
                                 </div>
-                            </Link>
-                        ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
         </div>
-    )
+    );
 }
 
-export default Notifications
+export default Notifications;

@@ -26,14 +26,6 @@ function Rating(props) {
             <div className="rating__stars">
                 <Stars value={props.value} />
             </div>
-            <div className="rating__count">
-                <div className="rating__value">
-                    {props.value}
-                </div>
-                {props.count > 0 ? <div className="rating__count">
-                    ({props.count})
-                </div> : null}
-            </div>
         </div>
     )
 }

@@ -41,12 +41,6 @@ function UserOptions() {
     setShow(false);
   };
 
-  const handleSwitchClick = () => {
-    const isFreelancer = Cookies.get('isFreelancer') === 'true';
-    Cookies.set('isFreelancer', (!isFreelancer).toString());
-    window.location.reload();
-    setShow(false);
-  };
 
   return (
     <div className="user-options" ref={userOptionsRef}>
@@ -92,12 +86,6 @@ function UserOptions() {
                 </div>
               </div>
             </Link>
-            <div className="user-options__body__item" onClick={handleSwitchClick}>
-              <div className="user-options__body__item__content">
-                <span className="material-symbols-outlined">cached</span>
-                <p className="user-options__body__item__content__message">Switch</p>
-              </div>
-            </div>
             <div className="user-options__body__item" onClick={() => {
               handleOptionClick();
               Cookies.remove('token');

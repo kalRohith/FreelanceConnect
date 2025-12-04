@@ -55,7 +55,7 @@ function Service() {
     const userId = useContext(UserContext).userId;
     const isFreelancer = Cookies.get('isFreelancer');
 
-    const { loading, error, data } = useQuery(GET_service_BY_ID, {
+    const { loading, error, data, refetch } = useQuery(GET_service_BY_ID, {
         variables: { serviceId: id },
     });
 
@@ -75,6 +75,11 @@ function Service() {
             variables: { serviceId: id }
         });
     };
+
+    // NOTE:
+    // Reviews are now only allowed for completed orders (from the Order page),
+    // so we no longer support ad-hoc rating directly from the service page.
+    const [userRating] = useState(0);
 
     if (loading) return <LoadingIndicator />;
     if (error) return `Error! ${error.message}`;
@@ -167,11 +172,12 @@ function Service() {
                             </div>
                         </div>
                     )}
-                    <Rating value={
-                        data.service.rating
-                    } count={
-                        data.service.reviews.length
-                    } />
+                    <Rating
+                        value={data.service.rating}
+                        count={data.service.reviews.length}
+                    />
+                    {/* Direct rating from the service page has been disabled.
+                        Users can leave a review only after an order is completed and paid. */}
                     <div className="service-image__carousel">
                         <ImageCarousel slidesToShow={1} slidesToScroll={1} images={
                             data.service.images

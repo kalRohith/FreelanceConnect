@@ -7,6 +7,9 @@ import { useFormik } from "formik";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import NavigationDrawer from "../navigation-drawer/NavigationDrawer";
+import Notifications from "../notifications/Notifications";
+import { gql, useQuery } from "@apollo/client";
+import UserContext from "../../UserContext";
 
 const validate = values => {
     const errors = {};
@@ -16,13 +19,34 @@ const validate = values => {
     return errors;
 };
 
+const GET_NOTIFICATIONS = gql`
+    query GetNotificationsByUserId($userId: ID!) {
+        notificationsByUserId(userId: $userId) {
+            id
+            content
+            date
+            order {
+                _id
+            }
+        }
+    }
+`;
+
 const MainNavigation = () => {
     // const handleUserDropdownClick = () => {
     //     // TODO: handle user dropdown click
     // };
 
+    const userContext = React.useContext(UserContext);
+
     // react hook for navigation
     const navigate = useNavigate();
+
+    const { data: notificationsData } = useQuery(GET_NOTIFICATIONS, {
+        skip: !userContext?.userId,
+        variables: { userId: userContext?.userId },
+        fetchPolicy: "cache-and-network",
+    });
 
 
     // const notifications = [
@@ -88,10 +112,10 @@ const MainNavigation = () => {
                 {/* <NavLink to="/messages" activeClassName="active-link">
                     <i className="fa fa-envelope" aria-hidden="true"></i>
                 </NavLink> */}
-                {/* <NavLink to="/notifications" activeClassName="active-link"> */}
-                {/* <i className="fa fa-bell" aria-hidden="true"></i> */}
-                {/* <Notifications notifications={notifications} /> */}
-                {/* </NavLink> */}
+                <div className="nav-icon-with-label">
+                    <Notifications notifications={notificationsData?.notificationsByUserId || []} />
+                    <span className="nav-icon-label">Notifications</span>
+                </div>
                 {/* <NavLink to="/saved" activeClassName="active-link">
                     <i className="fa fa-heart" aria-hidden="true"></i>
                 </NavLink> */}

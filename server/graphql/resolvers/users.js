@@ -12,6 +12,24 @@ const UsersResolver = {
             }
         },
     },
+    User: {
+        freelance_rating: async (parent) => {
+            try {
+                const user = await User.findById(parent._id || parent.id);
+                return user.freelance_rating || 0;
+            } catch (err) {
+                return 0;
+            }
+        },
+        client_rating: async (parent) => {
+            try {
+                const user = await User.findById(parent._id || parent.id);
+                return user.client_rating || 0;
+            } catch (err) {
+                return 0;
+            }
+        },
+    },
     Mutation: {
         updateUser: async (_parent, { userId, user }, context) => {
             if (!context.isAuth || context.userId !== userId) {
