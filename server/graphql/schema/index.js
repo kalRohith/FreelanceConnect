@@ -27,6 +27,7 @@ type Query {
   transactionsByUserId(userId: ID!): [Transaction]!,
 
   conversationByOrderId(orderId: ID!): Conversation!,
+  notificationsByUserId(userId: ID!): [Notification]!,
 },
 
 type Mutation {
@@ -88,6 +89,8 @@ type Notification {
   user: User!,
   content: String!,
   date: String!,
+  message: Message,
+  order: Order,
 },
 
 type Conversation {

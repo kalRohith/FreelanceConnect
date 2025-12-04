@@ -6,6 +6,7 @@ import usersResolver from './users.js';
 import uploadResolver from './upload.js';
 import ordersResolver from './orders.js';
 import chatsResolver from './chat.js';
+import notificationsResolver from './notifications.js';
 
 import merge from 'lodash/merge.js';
 
@@ -17,7 +18,8 @@ const resolvers = merge(
     usersResolver,
     uploadResolver,
     ordersResolver,
-    chatsResolver
+    chatsResolver,
+    notificationsResolver
 );
 
 export default resolvers;

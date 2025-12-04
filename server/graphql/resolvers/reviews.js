@@ -46,51 +46,121 @@ const ReviewsResolver = {
             if (!context.isAuth) {
                 throw new Error('Unauthenticated!');
             }
-            const newReview = new Review({
-                reviewer: context.userId,
-                reviewee: review.reviewee,
-                rating: review.rating,
-                content: review.content,
-                date: Date.now(),
-                order: review.order,
-                service: review.service
-            });
-
-            // update service rating
-            const order = await Order.findById(review.order);
-            if (order.freelancer.toString() !== context.userId.toString()) {
-                const service = await Service.findById(order.service);
-                const reviews = (await Review.find({ service: review.service })).filter(review => review.reviewee.toString() === service.freelancer.toString());
-                const ratings = reviews.map(review => review.rating);
-                const averageRating = ratings > 0 ? (ratings.reduce((a, b) => a + b, 0) + newReview.rating) / (ratings.length + 1) : newReview.rating;
-                console.log("ratings.reduce: ", ratings.reduce((a, b) => a + b, 0))
-                console.log("ratings count: ", ratings.length)
-                console.log("average rating: ", averageRating)
-                console.log("new review rating: ", newReview.rating)
-                service.rating = averageRating;
-                await service.save();
-            }
-
-            // update user rating as freelancer
-            const user = await User.findById(review.reviewee);
-            // find all reviews where user is the reviewee and is a freelancer
-            const allReviews = await Review.find({ reviewee: review.reviewee }).populate('order');
-            const reviews = allReviews.filter(review => review.order.freelancer.toString() === review.reviewee.toString());
-            const ratings = reviews.map(review => review.rating);
-            const averageRating = ratings > 0 ? (ratings.reduce((a, b) => a + b, 0) + newReview.rating) / (ratings.length + 1) : newReview.rating;
-
-            console.log(averageRating);
-
-            if (order.freelancer.toString() === review.reviewee.toString()) {
-                user.freelance_rating = averageRating;
-            } else {
-                user.client_rating = averageRating;
-            }
-            await user.save();
 
             try {
-                const result = await newReview.save();
-                return result;
+                // ---- Reviews can only be created for completed (CLOSED) orders ----
+                if (!review.order) {
+                    throw new Error('Reviews can only be created for completed orders.');
+                }
+
+                const order = await Order.findById(review.order);
+                if (!order) {
+                    throw new Error('Order not found.');
+                }
+
+                const isClient = order.client.toString() === context.userId.toString();
+                const isFreelancer = order.freelancer.toString() === context.userId.toString();
+
+                if (!isClient && !isFreelancer) {
+                    throw new Error('You are not allowed to review this order.');
+                }
+
+                // Order must be fully closed before a review is allowed
+                if (order.status !== 'CLOSED') {
+                    throw new Error('You can only review a service after the order is completed and paid.');
+                }
+
+                // Enforce one review per order per reviewer
+                const existingOrderReview = await Review.findOne({
+                    order: order._id,
+                    reviewer: context.userId
+                });
+
+                if (existingOrderReview) {
+                    throw new Error('You have already submitted a review for this order.');
+                }
+
+                // Ensure the service on the review (if provided) matches the order's service
+                const serviceIdFromOrder = order.service.toString();
+                if (review.service && review.service.toString() !== serviceIdFromOrder) {
+                    throw new Error('Review service does not match the order service.');
+                }
+
+                // Always bind the review to the service from the order to keep data consistent
+                const effectiveServiceId = review.service || serviceIdFromOrder;
+
+                // Create and save the review first
+                const newReview = new Review({
+                    reviewer: context.userId,
+                    reviewee: review.reviewee,
+                    rating: review.rating,
+                    content: review.content,
+                    date: Date.now(),
+                    order: order._id,
+                    service: effectiveServiceId
+                });
+
+                const savedReview = await newReview.save();
+
+                // ---- Update service rating (for the service being reviewed) ----
+                const service = await Service.findById(effectiveServiceId);
+
+                if (service) {
+                    // Prevent the service owner from rating their own service
+                    if (service.freelancer.toString() === context.userId.toString()) {
+                        throw new Error('You cannot rate your own service.');
+                    }
+
+                    // Attach the review to the service document for easier querying
+                    if (!service.reviews.find(rId => rId.toString() === savedReview._id.toString())) {
+                        service.reviews.push(savedReview._id);
+                    }
+
+                    const serviceReviews = await Review.find({
+                        service: service._id,
+                        reviewee: service.freelancer
+                    });
+
+                    const serviceRatings = serviceReviews.map(r => r.rating);
+                    const serviceAverage =
+                        serviceRatings.length > 0
+                            ? serviceRatings.reduce((a, b) => a + b, 0) / serviceRatings.length
+                            : 0;
+
+                    service.rating = serviceAverage;
+                    await service.save();
+                }
+
+                // ---- Update user rating (freelance_rating or client_rating) ----
+                const user = await User.findById(review.reviewee);
+
+                if (user) {
+                    // For order-based reviews, distinguish between freelancer/client roles
+                    const allReviews = await Review.find({ reviewee: review.reviewee }).populate('order');
+                    const relevantReviews = allReviews.filter(r => r.order && r.order.freelancer.toString() === r.reviewee.toString());
+                    const ratings = relevantReviews.map(r => r.rating);
+                    const averageRating =
+                        ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
+
+                    if (order && order.freelancer.toString() === review.reviewee.toString()) {
+                        user.freelance_rating = averageRating;
+                    } else {
+                        user.client_rating = averageRating;
+                    }
+
+                    await user.save();
+                }
+
+                // ---- Attach review reference back to the order (client_review / freelancer_review) ----
+                if (isClient) {
+                    order.client_review = savedReview._id;
+                } else if (isFreelancer) {
+                    order.freelancer_review = savedReview._id;
+                }
+
+                await order.save();
+
+                return savedReview;
             } catch (err) {
                 console.log(err);
                 throw err;

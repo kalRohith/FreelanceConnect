@@ -1,5 +1,7 @@
 import Conversation from '../../models/conversation.js';
 import Message from '../../models/message.js';
+import Notification from '../../models/notification.js';
+import User from '../../models/user.js';
 import { PubSub } from 'graphql-subscriptions';
 
 const pubsub = new PubSub();
@@ -46,18 +48,48 @@ const ChatResolver = {
                 });
                 const result = await newMessage.save();
 
-                const conversation = await Conversation.findById(message.conversation);
+                const conversation = await Conversation.findById(message.conversation)
+                    .populate('users');
 
-                if (context.userId !== conversation.users[0]._id.toString() && context.userId !== conversation.users[1]._id.toString()) {
+                if (
+                    !conversation ||
+                    conversation.users.length < 2 ||
+                    (context.userId !== conversation.users[0]._id.toString() &&
+                        context.userId !== conversation.users[1]._id.toString())
+                ) {
                     throw new Error("Unauthorized");
                 }
 
+                conversation.messages.push(result._id);
+                await conversation.save();
+
+                // Determine recipient (other user in the conversation)
+                const recipient = conversation.users.find(
+                    (u) => u._id.toString() !== context.userId.toString()
+                );
+
+                if (recipient) {
+                    // Create a notification for the recipient linked to this message and order
+                    const notification = new Notification({
+                        user: recipient._id,
+                        order: conversation.order,
+                        message: result._id,
+                        content: 'New message in your order conversation.',
+                    });
+                    const savedNotification = await notification.save();
+
+                    // Attach notification to the user document
+                    const recipientUser = await User.findById(recipient._id);
+                    if (recipientUser) {
+                        recipientUser.notifications.push(savedNotification._id);
+                        await recipientUser.save();
+                    }
+                }
+
+                // Publish the message to subscribers
                 pubsub.publish(message.conversation, {
                     messageSent: { ...result._doc, _id: result._id }
                 });
-
-                conversation.messages.push(result._id);
-                await conversation.save();
 
                 return { ...result._doc, _id: result._id };
             } catch (err) {
