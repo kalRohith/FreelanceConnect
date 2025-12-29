@@ -9,7 +9,6 @@ import { useQuery, gql, useMutation } from '@apollo/client';
 import defaultImage from '../../assets/images/default-user-image.png';
 import { useContext } from 'react';
 import UserContext from '../../UserContext';
-import Cookies from 'js-cookie';
 
 const GET_service_BY_ID = gql`
     query GetServiceById($serviceId: ID!) {
@@ -53,9 +52,8 @@ function Service() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const userId = useContext(UserContext).userId;
-    const isFreelancer = Cookies.get('isFreelancer');
 
-    const { loading, error, data, refetch } = useQuery(GET_service_BY_ID, {
+    const { loading, error, data } = useQuery(GET_service_BY_ID, {
         variables: { serviceId: id },
     });
 
@@ -75,11 +73,6 @@ function Service() {
             variables: { serviceId: id }
         });
     };
-
-    // NOTE:
-    // Reviews are now only allowed for completed orders (from the Order page),
-    // so we no longer support ad-hoc rating directly from the service page.
-    const [userRating] = useState(0);
 
     if (loading) return <LoadingIndicator />;
     if (error) return `Error! ${error.message}`;

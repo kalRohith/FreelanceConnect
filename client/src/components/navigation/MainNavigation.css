@@ -36,7 +36,7 @@ header {
     margin-right: 24px;
     font-family: 'Ubuntu', sans-serif;
     font-weight: 700;
-    color: #2DB67C;
+    color: #1E3A8A;
     font-size: 26px;
     user-select: none;
     letter-spacing: -0.5px;
@@ -138,7 +138,7 @@ a {
 }
 
 .main-navigation__nav-icons a:hover {
-    color: #2DB67C;
+    color: #3B82F6;
     transform: translateY(-1px);
 }
 
@@ -156,7 +156,7 @@ a {
 }
 
 .main-navigation__nav-icons a:hover .nav-link__wrapper p {
-    color: #2DB67C;
+    color: #3B82F6;
 }
 
 .responsive-search {

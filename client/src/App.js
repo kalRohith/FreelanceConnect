@@ -22,6 +22,7 @@ import Orders from './pages/Order/Orders';
 import Login from './pages/Login/Login';
 import Order from './pages/Order/Order';
 import Home from './pages/Home/Home';
+import NotificationsPage from './pages/Notifications/NotificationsPage';
 
 const GET_USER_BY_TOKEN = gql`
   query GetUserByToken($token: String!) {
@@ -82,6 +83,7 @@ function MainWrapper({ token }) {
               <Route exact path="/orders" element={<Orders />} />
               <Route exact path="/orders/:id" element={<Order />} />
               <Route exact path="/categories/:category" element={<Category />} />
+              <Route exact path="/notifications" element={<NotificationsPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </React.Fragment>

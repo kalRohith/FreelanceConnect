@@ -36,15 +36,34 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
 
 .notification__icon:hover {
-    color: #2DB67C;
+    color: #1E3A8A;
     transform: translateY(-1px);
 }
 
 .notification__icon .activated {
-    color: #2DB67C;
+    color: #1E3A8A;
+}
+
+.notification__badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #EF4444;
+    color: #FFFFFF;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #FFFFFF;
+    line-height: 1;
 }
 
 .notification__body {
