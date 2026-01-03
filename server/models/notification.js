@@ -22,6 +22,10 @@ const notificationSchema = new Schema({
         type: String,
         default: () => new Date().toISOString(),
     },
+    read: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 export default model('Notification', notificationSchema);

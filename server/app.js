@@ -1,9 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { createServer } from 'http';
 import express from 'express';
 import { makeExecutableSchema } from '@graphql-tools/schema';
+import { PubSub } from 'graphql-subscriptions';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import bodyParser from 'body-parser';
@@ -15,6 +19,9 @@ import { connect } from 'mongoose';
 import { verify } from 'jsonwebtoken';
 import { graphqlUploadExpress } from 'graphql-upload';
 import cookieParser from 'cookie-parser';
+// payment webhook handlers removed
+
+const pubsub = new PubSub();
 
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 
@@ -26,7 +33,20 @@ const wsServer = new WebSocketServer({
   path: '/graphql',
 });
 
-const serverCleanup = useServer({ schema }, wsServer);
+const serverCleanup = useServer({
+  schema,
+  context: async (ctx, msg, args) => {
+    const connectionParams = ctx.connectionParams || {};
+    const token = connectionParams.token;
+    if (!token) return { pubsub };
+    try {
+      const decoded = verify(token, process.env.JWT_KEY);
+      return { pubsub, userId: decoded.userId };
+    } catch (err) {
+      return { pubsub };
+    }
+  }
+}, wsServer);
 
 const server = new ApolloServer({
   schema,
@@ -44,9 +64,12 @@ const server = new ApolloServer({
   ],
 });
 
+
+
+
 connect(`mongodb+srv://
 ${process.env.MONGO_ATLAS_USER}:${encodeURIComponent(process.env.MONGO_ATLAS_PW)}
-@freelanceconnect.nblezz6.mongodb.net/${process.env.MONGO_ATLAS_DB}?retryWrites=true&w=majority`)
+@cluster0.34kjrrx.mongodb.net/${process.env.MONGO_ATLAS_DB}?retryWrites=true&w=majority`)
   .then(() => {
     console.log('Connected to the database');
   })
@@ -60,6 +83,8 @@ const corsOptions = {
 };
 
 await server.start();
+
+// payment webhook endpoints removed
 
 app.use(
   '/graphql',
@@ -106,6 +131,7 @@ app.use(
       return {
         isAuth: true,
         userId: decodedToken.userId,
+        pubsub,
       }
     } // Retrieve token from req.cookies
   }),

@@ -3,6 +3,14 @@ import Conversation from '../../models/conversation.js';
 import Transaction from '../../models/transaction.js';
 import Service from '../../models/service.js';
 import User from '../../models/user.js';
+import Notification from '../../models/notification.js';
+
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+} else {
+    console.warn('STRIPE_SECRET_KEY not set. Stripe payments are disabled. Set STRIPE_SECRET_KEY in server/.env for test mode.');
+}
 
 const OrdersResolver = {
     Query: {
@@ -196,11 +204,29 @@ const OrdersResolver = {
                     await freelancer.save();
                 }
 
+                // Create a notification for the freelancer and publish it so they receive it in real-time
+                try {
+                    const notif = new Notification({
+                        user: order.freelancer,
+                        order: savedOrder._id,
+                        content: `New order #${savedOrder._id.slice(-6)} received.`,
+                        read: false,
+                    });
+                    const savedNotif = await notif.save();
+                    const populated = await Notification.findById(savedNotif._id).populate('order').populate('user', 'username profile_picture');
+                    if (context && context.pubsub) {
+                        context.pubsub.publish('NOTIFICATION_SENT', { notificationSent: populated });
+                    }
+                } catch (e) {
+                    console.log('Failed to create notification', e);
+                }
+
                 return { ...savedOrder._doc, _id: savedOrder._id };
             } catch (err) {
                 throw err;
             }
         },
+        
         updateOrderStatus: async (_parent, { orderId, status }, context) => {
             if (!context.isAuth) {
                 throw new Error('Unauthenticated!');
@@ -303,10 +329,115 @@ const OrdersResolver = {
                 }
 
                 const result = await order.save();
+
+                // publish order update for subscribers
+                try {
+                    const populatedOrder = await Order.findById(result._id)
+                        .populate('client', 'username profile_picture')
+                        .populate('freelancer', 'username profile_picture')
+                        .populate('service', 'title')
+                        .populate('transaction');
+                    if (context && context.pubsub) {
+                        context.pubsub.publish(`ORDER_UPDATED_${result._id}`, { orderUpdated: populatedOrder });
+                        context.pubsub.publish('ORDER_UPDATED_GLOBAL', { orderUpdatedGlobal: populatedOrder });
+                    }
+                } catch (e) {
+                    console.error('Failed to publish order update', e);
+                }
+
                 return { ...result._doc, _id: result._id };
             } catch (err) {
                 throw err;
             }
+        }
+        ,
+        payOrder: async (_parent, { orderId }, context) => {
+            if (!context.isAuth) {
+                throw new Error('Unauthenticated!');
+            }
+            try {
+                const order = await Order.findById(orderId).populate('client').populate('freelancer').populate('transaction');
+                if (!order) throw new Error('Order not found');
+
+                const clientId = order.client._id ? order.client._id.toString() : order.client.toString();
+                if (context.userId !== clientId) throw new Error('Only the client can initiate payment');
+
+                if (!order.transaction) throw new Error('No transaction associated with order');
+                const transaction = await Transaction.findById(order.transaction);
+                if (!transaction) throw new Error('Transaction not found');
+
+                if (transaction.status === 'COMPLETED') {
+                    // already paid
+                } else {
+                    transaction.status = 'COMPLETED';
+                    transaction.date = new Date().toJSON().slice(0, 10);
+                    await transaction.save();
+
+                    // Update client spending
+                    const client = await User.findById(order.client._id);
+                    if (client) {
+                        client.spending = (client.spending || 0) + order.price;
+                        await client.save();
+                    }
+
+                    // Update freelancer earnings
+                    const freelancer = await User.findById(order.freelancer._id);
+                    if (freelancer) {
+                        freelancer.earnings = (freelancer.earnings || 0) + order.price;
+                        freelancer.balance = (freelancer.balance || 0) + order.price;
+                        await freelancer.save();
+                    }
+                }
+
+                const populatedOrder = await Order.findById(order._id)
+                    .populate('client', 'username profile_picture')
+                    .populate('freelancer', 'username profile_picture')
+                    .populate('service', 'title')
+                    .populate('transaction');
+
+                // publish order update
+                if (context && context.pubsub) {
+                    context.pubsub.publish(`ORDER_UPDATED_${order._id}`, { orderUpdated: populatedOrder });
+                    context.pubsub.publish('ORDER_UPDATED_GLOBAL', { orderUpdatedGlobal: populatedOrder });
+                }
+
+                // Create a notification for freelancer
+                try {
+                    const notif = new Notification({
+                        user: order.freelancer._id,
+                        order: order._id,
+                        content: `Order #${order._id.slice(-6)} has been paid by the client.`,
+                        read: false,
+                    });
+                    const savedNotif = await notif.save();
+                    const populated = await Notification.findById(savedNotif._id).populate('order').populate('user', 'username profile_picture');
+                    if (context && context.pubsub) {
+                        context.pubsub.publish('NOTIFICATION_SENT', { notificationSent: populated });
+                    }
+                } catch (e) {
+                    console.log('Failed to create payment notification', e);
+                }
+
+                return { ...populatedOrder._doc, _id: populatedOrder._id };
+            } catch (err) {
+                throw err;
+            }
+        }
+    }
+};
+
+// Attach Subscriptions
+OrdersResolver.Subscription = {
+    orderUpdated: {
+        subscribe: (_parent, { orderId }, context) => {
+            if (!context || !context.pubsub) throw new Error('PubSub not available');
+            return context.pubsub.asyncIterator([`ORDER_UPDATED_${orderId}`]);
+        }
+    },
+    orderUpdatedGlobal: {
+        subscribe: (_parent, _args, context) => {
+            if (!context || !context.pubsub) throw new Error('PubSub not available');
+            return context.pubsub.asyncIterator(['ORDER_UPDATED_GLOBAL']);
         }
     }
 };

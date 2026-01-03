@@ -43,12 +43,24 @@ type Mutation {
   multipleUpload(files: [Upload!]!): [File!]!,
   createOrder(order: OrderInput): Order,
   sendMessage(message: MessageInput): Message,
+  askDisputeBot(orderId: ID!, question: String!): Message,
+  payOrder(orderId: ID!): Order,
   updateOrderStatus(orderId: ID!, status: String!): Order,
+  markNotificationRead(notificationId: ID!): Notification,
+  
 },
 
 type Subscription {
   messageSent(conversationId: ID!): Message,
+  notificationSent(userId: ID!): Notification,
+  orderUpdated(orderId: ID!): Order,
+  orderUpdatedGlobal: Order,
 },
+
+type CheckoutSessionResult {
+  url: String!
+}
+ 
 
 type File {
     filename: String!,
@@ -87,6 +99,7 @@ input ReviewInput {
 type Notification {
   id: ID!,
   user: User!,
+  read: Boolean!,
   content: String!,
   date: String!,
   message: Message,

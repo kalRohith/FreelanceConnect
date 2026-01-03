@@ -54,6 +54,7 @@ const userSchema = new Schema({
             ref: 'Conversation'
         }
     ],
+    
 });
 
 export default model('User', userSchema);
