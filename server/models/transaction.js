@@ -27,7 +27,12 @@ const transactionSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'],
+        enum: ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'ESCROWED', 'RELEASED'],
+        default: 'PENDING'
+    },
+    escrow_status: {
+        type: String,
+        enum: ['PENDING', 'HELD', 'RELEASED', 'REFUNDED'],
         default: 'PENDING'
     },
     date: {
@@ -36,7 +41,9 @@ const transactionSchema = new Schema({
     },
     description: String,
     payment_method: String,
-    transaction_id: String // External payment gateway transaction ID if applicable
+    transaction_id: String, // External payment gateway transaction ID if applicable
+    payment_intent_id: String, // Payment intent ID from payment gateway
+    escrow_release_date: String // Date when escrow was released
 });
 
 export default model('Transaction', transactionSchema);

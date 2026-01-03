@@ -258,7 +258,8 @@
     margin-bottom: 30px;
 }
 
-.payment-status {
+.payment-status,
+.escrow-status {
     padding: 4px 12px;
     border-radius: 12px;
     font-size: 12px;
@@ -283,6 +284,34 @@
 }
 
 .payment-status--refunded {
+    background-color: #9e9e9e;
+    color: #fff;
+}
+
+.escrow-status {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.escrow-status--held {
+    background-color: #ff9800;
+    color: #fff;
+}
+
+.escrow-status--released {
+    background-color: #4CAF50;
+    color: #fff;
+}
+
+.escrow-status--refunded {
+    background-color: #f44336;
+    color: #fff;
+}
+
+.escrow-status--pending {
     background-color: #9e9e9e;
     color: #fff;
 }

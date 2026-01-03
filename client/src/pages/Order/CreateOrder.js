@@ -1,10 +1,11 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import './CreateOrder.css';
 import { useFormik } from 'formik';
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, gql, useQuery } from '@apollo/client';
 import UserContext from '../../UserContext';
 import ServiceCardHorizontal from '../../components/service-card/ServiceCardHorizontal';
+import PaymentForm from '../../components/payment/PaymentForm';
 
 const validate = values => {
     const errors = {};
@@ -50,6 +51,19 @@ const CREATE_ORDER = gql`
     }
 `;
 
+const INITIATE_PAYMENT = gql`
+    mutation InitiatePayment($orderId: ID!, $paymentMethod: PaymentMethodInput!) {
+        initiatePayment(orderId: $orderId, paymentMethod: $paymentMethod) {
+            success
+            message
+            order {
+                _id
+                status
+            }
+        }
+    }
+`;
+
 function CreateOrder(props) {
 
     const navigate = useNavigate();
@@ -58,15 +72,30 @@ function CreateOrder(props) {
 
     const userId = useContext(UserContext).userId;
 
+    const [showPayment, setShowPayment] = useState(false);
+    const [createdOrderId, setCreatedOrderId] = useState(null);
+
     const { loading: serviceLoading, error: serviceError, data: serviceData } = useQuery(GET_SERVICE, {
         variables: { serviceId: serviceId },
     });
 
     const [createOrder, { data: orderData, loading: orderLoading, error: orderError, reset: orderReset }] = useMutation(CREATE_ORDER);
+    const [initiatePayment, { loading: paymentLoading, error: paymentError }] = useMutation(INITIATE_PAYMENT);
 
-    if (orderData) {
-        navigate(`/orders/${orderData.createOrder._id}`);
-    }
+    // When order is created, show payment form
+    React.useEffect(() => {
+        if (orderData && orderData.createOrder) {
+            setCreatedOrderId(orderData.createOrder._id);
+            setShowPayment(true);
+        }
+    }, [orderData]);
+
+    // When payment is successful, navigate to order page
+    React.useEffect(() => {
+        if (createdOrderId && !paymentLoading && !paymentError) {
+            // Payment success will be handled in handlePaymentSubmit
+        }
+    }, [createdOrderId, paymentLoading, paymentError]);
 
     const formik = useFormik({
         initialValues: {
@@ -89,6 +118,60 @@ function CreateOrder(props) {
             });
         },
     });
+
+    const handlePaymentSubmit = async (paymentMethod) => {
+        if (!createdOrderId) return;
+
+        try {
+            const result = await initiatePayment({
+                variables: {
+                    orderId: createdOrderId,
+                    paymentMethod: paymentMethod
+                }
+            });
+
+            if (result.data?.initiatePayment?.success) {
+                navigate(`/orders/${createdOrderId}`);
+            } else {
+                alert(result.data?.initiatePayment?.message || 'Payment failed');
+            }
+        } catch (err) {
+            console.error('Payment error:', err);
+            alert(err.message || 'Payment processing failed. Please try again.');
+        }
+    };
+
+    const handlePaymentCancel = () => {
+        if (window.confirm('Are you sure you want to cancel? The order will be created but payment will be pending.')) {
+            navigate(`/orders/${createdOrderId}`);
+        }
+    };
+
+    // Show payment form if order is created
+    if (showPayment && createdOrderId && serviceData) {
+        return (
+            <div className='create-order__container col-xs-12 col-sm-12 col-md-8 col-lg-6'>
+                <h1>Complete Payment</h1>
+                <div style={{ marginBottom: '20px', padding: '16px', background: '#e3f2fd', borderRadius: '8px' }}>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#555' }}>
+                        <strong>Order Created:</strong> Order #{createdOrderId.slice(-6)} has been created. 
+                        Please complete the payment to proceed. Funds will be held in escrow until order completion.
+                    </p>
+                </div>
+                <PaymentForm
+                    amount={parseFloat(formik.values.order_price)}
+                    onSubmit={handlePaymentSubmit}
+                    onCancel={handlePaymentCancel}
+                    loading={paymentLoading}
+                />
+                {paymentError && (
+                    <div style={{ marginTop: '16px', padding: '12px', background: '#ffebee', borderRadius: '8px', color: '#c62828' }}>
+                        {paymentError.message}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className='create-order__container col-xs-12 col-sm-12 col-md-8 col-lg-6'>

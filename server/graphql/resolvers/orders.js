@@ -4,6 +4,7 @@ import Transaction from '../../models/transaction.js';
 import Service from '../../models/service.js';
 import User from '../../models/user.js';
 import Notification from '../../models/notification.js';
+import Stripe from 'stripe';
 
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {

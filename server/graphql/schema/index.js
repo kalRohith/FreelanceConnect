@@ -47,6 +47,9 @@ type Mutation {
   payOrder(orderId: ID!): Order,
   updateOrderStatus(orderId: ID!, status: String!): Order,
   markNotificationRead(notificationId: ID!): Notification,
+  initiatePayment(orderId: ID!, paymentMethod: PaymentMethodInput!): PaymentResult!,
+  releaseEscrow(orderId: ID!): PaymentResult!,
+  refundEscrow(orderId: ID!): PaymentResult!,
   
 },
 
@@ -252,10 +255,29 @@ type Transaction {
   amount: Float!,
   type: String!,
   status: String!,
+  escrow_status: String,
   date: String!,
   description: String,
   payment_method: String,
   transaction_id: String,
+  payment_intent_id: String,
+  escrow_release_date: String,
+},
+
+type PaymentResult {
+  success: Boolean!,
+  message: String!,
+  transaction: Transaction,
+  order: Order,
+  payment_intent_id: String,
+},
+
+input PaymentMethodInput {
+  type: String!,
+  card_number: String,
+  card_expiry: String,
+  card_cvv: String,
+  cardholder_name: String,
 },
 
 input OrderInput {
