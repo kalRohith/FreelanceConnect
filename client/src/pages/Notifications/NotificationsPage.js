@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery, gql } from '@apollo/client';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, gql } from '@apollo/client';
 import UserContext from '../../UserContext';
 import './NotificationsPage.css';
 import { FaBell } from 'react-icons/fa';
@@ -10,10 +10,20 @@ const GET_NOTIFICATIONS = gql`
         notificationsByUserId(userId: $userId) {
             id
             content
+            read
             date
             order {
                 _id
             }
+        }
+    }
+`;
+
+const MARK_NOTIFICATION_READ = gql`
+    mutation MarkNotificationRead($notificationId: ID!) {
+        markNotificationRead(notificationId: $notificationId) {
+            id
+            read
         }
     }
 `;
@@ -28,6 +38,12 @@ function NotificationsPage() {
     });
 
     const notifications = data?.notificationsByUserId || [];
+
+    const navigate = useNavigate();
+
+    const [markRead] = useMutation(MARK_NOTIFICATION_READ, {
+        refetchQueries: [{ query: GET_NOTIFICATIONS, variables: { userId: userContext?.userId } }],
+    });
 
     if (loading) {
         return (
@@ -65,7 +81,7 @@ function NotificationsPage() {
                     <p className="header-subtitle">
                         {notifications.length === 0 
                             ? "You don't have any notifications yet"
-                            : `${notifications.length} ${notifications.length === 1 ? 'notification' : 'notifications'}`
+                            : `${notifications.length === 1 ? '1 notification' : `${notifications.length} notifications`}`
                         }
                     </p>
                 </div>
@@ -86,20 +102,39 @@ function NotificationsPage() {
                                     </div>
                                 );
 
+                                const itemKey = notification.id;
+                                const markAndNavigate = async (e) => {
+                                    try {
+                                        await markRead({ variables: { notificationId: notification.id } });
+                                    } catch (err) {
+                                        // swallow
+                                    }
+                                };
+
                                 if (hasOrder) {
                                     return (
-                                        <Link
-                                            key={notification.id}
-                                            to={`/orders/${notification.order._id}`}
-                                            className="notification-item notification-item--clickable"
+                                        <div
+                                            key={itemKey}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={async (e) => {
+                                                e.preventDefault();
+                                                try {
+                                                    await markRead({ variables: { notificationId: notification.id } });
+                                                } catch (err) {
+                                                    // ignore
+                                                }
+                                                navigate(`/orders/${notification.order._id}`);
+                                            }}
+                                            className={`notification-item notification-item--clickable ${notification.read ? 'notification-item--read' : ''}`}
                                         >
                                             {content}
-                                        </Link>
+                                        </div>
                                     );
                                 }
 
                                 return (
-                                    <div key={notification.id} className="notification-item">
+                                    <div key={itemKey} className={`notification-item ${notification.read ? 'notification-item--read' : ''}`} onClick={markAndNavigate}>
                                         {content}
                                     </div>
                                 );

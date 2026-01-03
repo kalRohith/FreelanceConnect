@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import './Orders.css';
 import { Link } from 'react-router-dom';
 import { useQuery, gql } from '@apollo/client';
+import { useSubscription } from '@apollo/client';
 import defaultImage from '../../assets/images/default-user-image.png';
 import UserContext from '../../UserContext';
 import { formatDate } from '../../utils/FormatUtils';
@@ -54,15 +55,36 @@ const GET_ORDERS_BY_FREELANCER_ID = gql`
     }
 `;
 
+const ORDER_UPDATED_GLOBAL = gql`
+    subscription orderUpdatedGlobal {
+        orderUpdatedGlobal {
+            _id
+            status
+            transaction { _id status }
+        }
+    }
+`;
+
 function Orders() {
     const userId = useContext(UserContext).userId;
 
-    const { data: clientData } = useQuery(GET_ORDERS_BY_CLIENT_ID, {
+    const { data: clientData, refetch: refetchClient } = useQuery(GET_ORDERS_BY_CLIENT_ID, {
         variables: { userId },
     });
 
-    const { data: freelancerData } = useQuery(GET_ORDERS_BY_FREELANCER_ID, {
+    const { data: freelancerData, refetch: refetchFreelancer } = useQuery(GET_ORDERS_BY_FREELANCER_ID, {
         variables: { userId },
+    });
+
+    useSubscription(ORDER_UPDATED_GLOBAL, {
+        onSubscriptionData: async () => {
+            try {
+                if (refetchClient) await refetchClient();
+                if (refetchFreelancer) await refetchFreelancer();
+            } catch (e) {
+                console.error('Failed to refetch orders after update', e);
+            }
+        }
     });
 
     const clientOrders = clientData?.ordersByClientId || [];

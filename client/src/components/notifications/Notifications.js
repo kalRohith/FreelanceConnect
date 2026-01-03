@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import './Notifications.css';
 
 function Notifications({ notifications }) {
-    const unreadCount = notifications?.filter(n => n).length || 0;
+    // count notifications that are not read
+    const unreadCount = notifications?.filter(n => n && !n.read).length || 0;
 
     return (
         <div className="notification">

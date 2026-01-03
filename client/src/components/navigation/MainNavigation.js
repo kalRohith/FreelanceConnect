@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import NavigationDrawer from "../navigation-drawer/NavigationDrawer";
 import Notifications from "../notifications/Notifications";
-import { gql, useQuery } from "@apollo/client";
+import { gql, useQuery, useSubscription, useApolloClient } from "@apollo/client";
 import UserContext from "../../UserContext";
 
 const validate = values => {
@@ -24,6 +24,7 @@ const GET_NOTIFICATIONS = gql`
         notificationsByUserId(userId: $userId) {
             id
             content
+            read
             date
             order {
                 _id
@@ -31,6 +32,20 @@ const GET_NOTIFICATIONS = gql`
         }
     }
 `;
+
+const NOTIFICATION_SUBSCRIPTION = gql`
+    subscription NotificationSent($userId: ID!) {
+        notificationSent(userId: $userId) {
+            id
+            content
+            read
+            date
+            order { _id }
+            user { _id username profile_picture }
+        }
+    }
+`;
+
 
 const MainNavigation = () => {
     // const handleUserDropdownClick = () => {
@@ -46,6 +61,18 @@ const MainNavigation = () => {
         skip: !userContext?.userId,
         variables: { userId: userContext?.userId },
         fetchPolicy: "cache-and-network",
+    });
+    const client = useApolloClient();
+    useSubscription(NOTIFICATION_SUBSCRIPTION, {
+        skip: !userContext?.userId,
+        variables: { userId: userContext?.userId },
+        onSubscriptionData: async ({ subscriptionData }) => {
+            try {
+                await client.query({ query: GET_NOTIFICATIONS, variables: { userId: userContext?.userId }, fetchPolicy: 'network-only' });
+            } catch (e) {
+                // ignore
+            }
+        }
     });
 
 

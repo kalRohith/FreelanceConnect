@@ -6,7 +6,6 @@ import SentMessage from '../../components/message/SentMessage';
 import { useMutation } from '@apollo/client';
 import './Order.css';
 import { useState } from 'react';
-import Cookies from 'js-cookie';
 import ReceivedMessage from '../../components/message/ReceivedMessage';
 import { formatDate } from '../../utils/FormatUtils';
 import { useRef } from 'react';
@@ -85,6 +84,22 @@ const SEND_MESSAGE = gql`
     }
 `;
 
+const ASK_DISPUTE_BOT = gql`
+    mutation askDisputeBot($orderId: ID!, $question: String!) {
+        askDisputeBot(orderId: $orderId, question: $question) {
+            _id
+            body
+            sender {
+                _id
+                username
+                profile_picture
+            }
+            date
+            conversation
+        }
+    }
+`;
+
 const UPDATE_ORDER_STATUS = gql`
     mutation updateOrderStatus($orderId: ID!, $status: String!) {
         updateOrderStatus(orderId: $orderId, status: $status) {
@@ -92,6 +107,34 @@ const UPDATE_ORDER_STATUS = gql`
         }
     }
 `;
+
+const PAY_ORDER = gql`
+    mutation payOrder($orderId: ID!) {
+        payOrder(orderId: $orderId) {
+            _id
+            status
+            transaction {
+                _id
+                status
+            }
+        }
+    }
+`;
+
+const ORDER_UPDATED = gql`
+    subscription orderUpdated($orderId: ID!) {
+        orderUpdated(orderId: $orderId) {
+            _id
+            status
+            transaction {
+                _id
+                status
+            }
+        }
+    }
+`;
+
+
 
 const MESSAGE_SUBSCRIPTION = gql`
     subscription messageSent($conversationId: ID!) {
@@ -255,11 +298,11 @@ function GetOrderStatus({ status }) {
     }
 }
 
-function GetOrderActions({ status, updateOrderStatus, orderId }) {
+function GetOrderActions({ status, updateOrderStatus, orderId, isOrderFreelancer, transactionStatus, isClient, onPay }) {
 
-    const isFreelancer = Cookies.get('isFreelancer');
+    const isFreelancer = isOrderFreelancer === true || isOrderFreelancer === 'true';
 
-    if (isFreelancer === 'true') {
+    if (isFreelancer) {
         switch (status) {
             case 'pending':
                 return (
@@ -326,16 +369,27 @@ function GetOrderActions({ status, updateOrderStatus, orderId }) {
                     </div>
                 );
             case 'completed':
+                // show Pay button to client if transaction not completed
+                if (isClient) {
+                    // if already paid, show Paid label
+                    if (transactionStatus && transactionStatus.toLowerCase() === 'completed') {
+                        return (
+                            <div className='order__actions row'>
+                                <div className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Paid</div>
+                            </div>
+                        );
+                    }
+                    return (
+                        <div className='order__actions row'>
+                            <button
+                                onClick={() => { if (onPay) onPay(orderId); }}
+                                className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Pay</button>
+                        </div>
+                    );
+                }
                 return (
                     <div className='order__actions row'>
-                        <button
-                            onClick={() => {
-                                updateOrderStatus({ variables: { orderId: orderId, status: 'CLOSED' } })
-                                    .then(() => {
-                                        window.location.reload();
-                                    });
-                            }}
-                            className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Pay</button>
+                        <div className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Waiting for client payment</div>
                     </div>
                 );
             default:
@@ -364,9 +418,11 @@ function Order() {
 
     const userId = userData.userId;
 
-    const isFreelancer = Cookies.get('isFreelancer');
+    
 
     const [messages, setMessages] = useState([]);
+    const [botQuestion, setBotQuestion] = useState('');
+    const [activeChatTab, setActiveChatTab] = useState('messages');
 
     const [message, setMessage] = useState('');
 
@@ -390,6 +446,9 @@ function Order() {
         }
     }, [dataConversation]);
 
+    const [askDisputeBot] = useMutation(ASK_DISPUTE_BOT);
+    const [payOrder] = useMutation(PAY_ORDER);
+
     // if (dataConversation)
     //     console.log(dataConversation.conversationByOrderId.messages);
 
@@ -401,10 +460,17 @@ function Order() {
         data: dataSendMessage
     }] = useMutation(SEND_MESSAGE);
 
-    const { loading, error, data } = useQuery(GET_ORDER, {
+    const { loading, error, data, refetch } = useQuery(GET_ORDER, {
         variables: { orderId: orderId },
     }
     );
+
+    useSubscription(ORDER_UPDATED, {
+        variables: { orderId },
+        onSubscriptionData: async () => {
+            try { await refetch(); } catch (e) { console.error('refetch failed', e); }
+        }
+    });
     if (loading) return <p>Loading...</p>;
     if (error) return `Error! ${error.message}`;
 
@@ -485,7 +551,20 @@ function Order() {
                                 }
                                 orderId={
                                     data.orderById._id
-                                } />
+                                }
+                                    isOrderFreelancer={userId === data.orderById.freelancer._id}
+                                    transactionStatus={data.orderById.transaction?.status}
+                                    isClient={userId === data.orderById.client._id}
+                                    onPay={async (orderIdParam) => {
+                                        try {
+                                            await payOrder({ variables: { orderId: orderIdParam } });
+                                        } catch (err) {
+                                            console.error(err);
+                                            alert('Payment failed');
+                                        }
+                                    }}
+                            />
+                            
                         </div>
                         <div className='order__body__chat'>
                         </div>
@@ -504,7 +583,42 @@ function Order() {
                                 </div>
                             </div>
                         </div>
-                        {(data.orderById.status.toLowerCase() === 'in_progress' || data.orderById.status.toLowerCase() === 'pending') &&
+                                <div className='order__chat__tabs'>
+                                    <div className={`order__chat__tab ${activeChatTab === 'messages' ? 'order__chat__tab--active' : ''}`} onClick={() => setActiveChatTab('messages')}>Messages</div>
+                                    <div className={`order__chat__tab ${activeChatTab === 'bot' ? 'order__chat__tab--active' : ''}`} onClick={() => setActiveChatTab('bot')}>Dispute Bot</div>
+                                </div>
+
+                                {activeChatTab === 'bot' && (
+                                    <div className='chatbot-panel'>
+                                        <textarea
+                                            onChange={(e) => setBotQuestion(e.target.value)}
+                                            value={botQuestion}
+                                            placeholder='Ask Dispute Bot (e.g. refund, late delivery)...' />
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                                            <button
+                                                onClick={async () => {
+                                                    if (!botQuestion || !dataConversation) return;
+                                                    try {
+                                                        const res = await askDisputeBot({ variables: { orderId: data.orderById._id, question: botQuestion } });
+                                                        const botMsg = res && res.data && res.data.askDisputeBot;
+                                                        if (botMsg) {
+                                                            setMessages([...messages, botMsg]);
+                                                            setActiveChatTab('messages');
+                                                        }
+                                                        setBotQuestion('');
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        alert('Error contacting bot');
+                                                    }
+                                                }}
+                                                className='order__chat__bot-button'>
+                                                Ask Bot
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(data.orderById.status.toLowerCase() === 'in_progress' || data.orderById.status.toLowerCase() === 'pending') &&
                             <div className='order__chat__input'>
                                 <input
                                     onChange={handleMessageChange}
