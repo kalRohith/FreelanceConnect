@@ -1,3 +1,7 @@
 .services h2{
     margin-top: 60px;
 }
+
+.services__grid__wrapper{
+    padding-top: 20px;
+}

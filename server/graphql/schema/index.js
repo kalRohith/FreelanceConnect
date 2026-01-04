@@ -47,6 +47,7 @@ type Mutation {
   payOrder(orderId: ID!): Order,
   updateOrderStatus(orderId: ID!, status: String!): Order,
   markNotificationRead(notificationId: ID!): Notification,
+  createCheckoutSession(serviceId: ID!): String
   
 },
 
@@ -180,6 +181,7 @@ type Service {
   reviews: [Review]!,
   orders: [Order]!,
   images: [String]!,
+  recommendationScore: Float!,
 },
 
 input ServiceInput {

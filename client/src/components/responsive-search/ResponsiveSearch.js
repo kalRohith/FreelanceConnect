@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFormik } from 'formik';
 import { useNavigate } from 'react-router-dom';
 import './ResponsiveSearch.css';
@@ -12,7 +12,7 @@ const validate = values => {
 };
 
 function ResponsiveSearch() {
-
+    const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
 
     const formik = useFormik({
@@ -20,26 +20,24 @@ function ResponsiveSearch() {
             search_query: '',
         },
         validate,
-        onChange: values => {
-            console.log(values);
-        },
         onSubmit: values => {
-            console.log(values);
-            navigate(`/search/${values.search_query}`);
-        },
-        onReset: values => {
-            console.log(values);
+            if(values.search_query.trim()){
+                navigate(`/search/${values.search_query}`);
+                setIsOpen(false); // Close bar on search
+            }
         }
     });
 
     return (
         <div className="responsive-search">
-            <div className="responsive-search__icon" onClick={() => {
-                document.getElementsByClassName("responsive-search__wrapper")[0].style.width = "100%";
-            }}>
+            <div className="responsive-search__icon" onClick={() => setIsOpen(true)}>
                 <span className="material-symbols-outlined">search</span>
             </div>
-            <div className="responsive-search__wrapper">
+            
+            <div 
+                className="responsive-search__wrapper" 
+                style={{ width: isOpen ? "100%" : "0px" }}
+            >
                 <form
                     className="main-navigation__responsive-search-form"
                     onSubmit={formik.handleSubmit}
@@ -49,23 +47,24 @@ function ResponsiveSearch() {
                             type="text"
                             name="search_query"
                             id="search_query"
-                            placeholder="Search for services"
+                            placeholder="Find services (e.g. 'React Developer')"
                             className="main-navigation__search-input"
                             onChange={formik.handleChange}
                             onBlur={formik.handleBlur}
                             value={formik.values.search_query}
+                            autoComplete="off"
                         />
                     </div>
                 </form>
                 <div className="responsive-search__close-icon" onClick={() => {
-                    document.getElementsByClassName("responsive-search__wrapper")[0].style.width = "0px";
+                    setIsOpen(false);
                     formik.resetForm();
                 }}>
                     <span className="material-symbols-outlined">close</span>
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
 export default ResponsiveSearch;

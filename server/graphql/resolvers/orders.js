@@ -4,6 +4,7 @@ import Transaction from '../../models/transaction.js';
 import Service from '../../models/service.js';
 import User from '../../models/user.js';
 import Notification from '../../models/notification.js';
+import Stripe from 'stripe';
 
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -209,7 +210,7 @@ const OrdersResolver = {
                     const notif = new Notification({
                         user: order.freelancer,
                         order: savedOrder._id,
-                        content: `New order #${savedOrder._id.slice(-6)} received.`,
+                        content: `New order #${savedOrder._id.toString().slice(-6)} received.`,
                         read: false,
                     });
                     const savedNotif = await notif.save();
@@ -349,8 +350,8 @@ const OrdersResolver = {
             } catch (err) {
                 throw err;
             }
-        }
-        ,
+        },
+
         payOrder: async (_parent, { orderId }, context) => {
             if (!context.isAuth) {
                 throw new Error('Unauthenticated!');
@@ -366,21 +367,23 @@ const OrdersResolver = {
                 const transaction = await Transaction.findById(order.transaction);
                 if (!transaction) throw new Error('Transaction not found');
 
-                if (transaction.status === 'COMPLETED') {
-                    // already paid
-                } else {
+                // 1. Update Transaction
+                if (transaction.status !== 'COMPLETED') {
                     transaction.status = 'COMPLETED';
                     transaction.date = new Date().toJSON().slice(0, 10);
                     await transaction.save();
 
-                    // Update client spending
+                    // 2. Automatically set Order to CLOSED so reviews become allowed
+                    order.status = 'CLOSED'; 
+                    await order.save();
+
+                    // 3. Update Financials
                     const client = await User.findById(order.client._id);
                     if (client) {
                         client.spending = (client.spending || 0) + order.price;
                         await client.save();
                     }
 
-                    // Update freelancer earnings
                     const freelancer = await User.findById(order.freelancer._id);
                     if (freelancer) {
                         freelancer.earnings = (freelancer.earnings || 0) + order.price;
@@ -395,27 +398,22 @@ const OrdersResolver = {
                     .populate('service', 'title')
                     .populate('transaction');
 
-                // publish order update
+                // 4. Real-time Notifications
                 if (context && context.pubsub) {
                     context.pubsub.publish(`ORDER_UPDATED_${order._id}`, { orderUpdated: populatedOrder });
                     context.pubsub.publish('ORDER_UPDATED_GLOBAL', { orderUpdatedGlobal: populatedOrder });
                 }
 
-                // Create a notification for freelancer
                 try {
                     const notif = new Notification({
                         user: order.freelancer._id,
                         order: order._id,
-                        content: `Order #${order._id.slice(-6)} has been paid by the client.`,
+                        content: `Order #${order._id.toString().slice(-6)} paid! Please check your reviews.`,
                         read: false,
                     });
-                    const savedNotif = await notif.save();
-                    const populated = await Notification.findById(savedNotif._id).populate('order').populate('user', 'username profile_picture');
-                    if (context && context.pubsub) {
-                        context.pubsub.publish('NOTIFICATION_SENT', { notificationSent: populated });
-                    }
+                    await notif.save();
                 } catch (e) {
-                    console.log('Failed to create payment notification', e);
+                    console.log('Notification error', e);
                 }
 
                 return { ...populatedOrder._doc, _id: populatedOrder._id };

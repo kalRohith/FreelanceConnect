@@ -1,20 +1,38 @@
+import 'dotenv/config';
+
 import Conversation from '../../models/conversation.js';
 import Message from '../../models/message.js';
-import Notification from '../../models/notification.js';
 import User from '../../models/user.js';
 import Order from '../../models/order.js';
-import Service from '../../models/service.js';
 import { PubSub } from 'graphql-subscriptions';
 
 const pubsub = new PubSub();
+
+// --- HELPER: Local Risk Engine (Fallback when AI is offline) ---
+const calculateManualRisk = (text) => {
+  let score = 0.2; // Default low risk
+  const highRiskKeywords = [/scam/i, /police/i, /fraud/i, /stolen/i, /lawyer/i, /sue/i];
+  const medRiskKeywords = [/refund/i, /late/i, /worst/i, /lying/i, /ignore/i, /money/i];
+
+  highRiskKeywords.forEach(regex => { if (regex.test(text)) score += 0.4; });
+  medRiskKeywords.forEach(regex => { if (regex.test(text)) score += 0.15; });
+
+  return Math.min(score, 1.0); // Cap at 1.0
+};
+
+// --- HELPER: Extract JSON safely ---
+const extractJSON = (str) => {
+  const match = str.match(/\{[\s\S]*\}/);
+  return match ? match[0] : null;
+};
 
 const ChatResolver = {
   Subscription: {
     messageSent: {
       subscribe: (_parent, { conversationId }) => {
         return pubsub.asyncIterator([conversationId]);
-      }
-    }
+      },
+    },
   },
 
   Query: {
@@ -22,18 +40,19 @@ const ChatResolver = {
       if (!context.isAuth) throw new Error("Unauthenticated");
 
       const conversation = await Conversation.findOne({ order: orderId })
-        .populate('messages')
-        .populate('users', 'username profile_picture');
+        .populate("messages")
+        .populate("users", "username profile_picture");
 
       if (!conversation) throw new Error("Conversation not found");
 
       const allowed = conversation.users.some(
-        u => u._id.toString() === context.userId
+        (u) => u._id.toString() === context.userId
       );
+
       if (!allowed) throw new Error("Unauthorized");
 
       return { ...conversation._doc, _id: conversation._id };
-    }
+    },
   },
 
   Mutation: {
@@ -44,144 +63,127 @@ const ChatResolver = {
         sender: message.sender,
         body: message.body,
         date: Date.now(),
-        conversation: message.conversation
+        conversation: message.conversation,
       });
 
       const savedMessage = await newMessage.save();
 
-      const conversation = await Conversation.findById(message.conversation)
-        .populate('users');
+      const conversation = await Conversation.findById(
+        message.conversation
+      ).populate("users");
 
       if (!conversation) throw new Error("Conversation not found");
 
       const allowed = conversation.users.some(
-        u => u._id.toString() === context.userId
+        (u) => u._id.toString() === context.userId
       );
+
       if (!allowed) throw new Error("Unauthorized");
 
       conversation.messages.push(savedMessage._id);
       await conversation.save();
 
       pubsub.publish(message.conversation, {
-        messageSent: { ...savedMessage._doc, _id: savedMessage._id }
+        messageSent: { ...savedMessage._doc, _id: savedMessage._id },
       });
 
       return { ...savedMessage._doc, _id: savedMessage._id };
     },
 
     askDisputeBot: async (_parent, { orderId, question }, context) => {
-        console.log('Gemini key loaded:', !!process.env.GEMINI_API_KEY);
+      // 1. Debugging Logs (Check your terminal for these!)
+      console.log("--- DISPUTE BOT TRIGGERED ---");
+      console.log("Context User:", context.userId ? "Auth OK" : "No Auth");
+      console.log("API Key Status:", process.env.GEMINI_API_KEY ? "✅ Key Found" : "❌ Key Missing/Undefined");
 
-      if (!context.isAuth) throw new Error('Unauthenticated');
+      if (!context.isAuth) throw new Error("Unauthenticated");
 
+      // 2. Fetch Data
       const conversation = await Conversation.findOne({ order: orderId })
-        .populate('messages')
-        .populate('users');
+        .populate("messages")
+        .populate("users");
 
-      if (!conversation) throw new Error('Conversation not found');
+      const order = await Order.findById(orderId);
+      if (!conversation || !order) throw new Error("Order not found");
 
-      const isParticipant = conversation.users.some(
-        u => u._id.toString() === context.userId
-      );
-      if (!isParticipant) throw new Error('Unauthorized');
-
-      // Build recent context
       const recentMessages = conversation.messages
-        .slice(-8)
-        .map(m => m.body)
-        .join('\n');
+        .slice(-10)
+        .map((m) => `${m.sender}: ${m.body}`)
+        .join("\n");
 
-      let reply = '';
+      // Default strings
+      let reply = "I am reviewing the case details."; 
+      let riskScore = 0.5;
 
-      /* ================= GEMINI AI ================= */
+      // 3. AI Logic
       if (process.env.GEMINI_API_KEY) {
+        console.log("Attempting to contact Gemini AI...");
         try {
-          let fetchFn = global.fetch;
-          if (!fetchFn) {
-            fetchFn = (await import('node-fetch')).default;
-          }
+          const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-          const systemPrompt =
-            `You are a Dispute Resolution Assistant for a freelancing platform.
-Give short, practical advice. Be neutral and professional.`;
+          const systemPrompt = `You are a neutral Dispute Resolution Assistant.
+          Analyze the context and the user's question.
+          Return a JSON object with:
+          - "reply": Short, professional advice.
+          - "riskScore": A number between 0.0 and 1.0.
+          DO NOT use Markdown.`;
 
-          const prompt =
-            `${systemPrompt}\n\nUser question:\n${question}\n\nConversation context:\n${recentMessages}`;
+          const prompt = `Context:\n${recentMessages}\n\nUser Question: ${question}`;
 
-          const resp = await fetchFn(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    role: "user",
-                    parts: [{ text: prompt }]
-                  }
-                ],
-                generationConfig: {
-                  temperature: 0.2,
-                  maxOutputTokens: 350
-                }
-              })
-            }
-          );
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `${systemPrompt}\n\n${prompt}` }] }],
+              generationConfig: { response_mime_type: "application/json" }
+            })
+          });
 
           const data = await resp.json();
+          
+          if (data.error) {
+             console.error("Gemini API Error:", data.error.message);
+             throw new Error("API_ERROR");
+          }
 
-            console.log('Gemini status:', resp.status);
-            console.log('Gemini raw response:', JSON.stringify(data, null, 2));
-
-            reply =
-            data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-
+          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          const jsonString = extractJSON(rawText); 
+          const aiResult = JSON.parse(jsonString);
+          
+          reply = aiResult.reply;
+          riskScore = aiResult.riskScore;
+          console.log("✅ AI Success. Risk Score:", riskScore);
 
         } catch (err) {
-          console.error('Gemini API failed, using fallback', err);
+          console.warn("⚠️ AI Failed, using manual fallback. Reason:", err.message);
+          
+          // MANUAL FALLBACK
+          riskScore = calculateManualRisk(recentMessages + " " + question);
+          reply = riskScore > 0.7 
+            ? "I detect high tension in this dispute. I have flagged this for immediate human review." 
+            : "I am currently running in offline mode. Please contact support if you need urgent help.";
         }
+      } else {
+         console.error("❌ SKIPPING AI: No API Key found in process.env");
       }
 
-      /* ============ RULE-BASED FALLBACK ============ */
-      if (!reply) {
-        const text = (question + ' ' + recentMessages).toLowerCase();
-
-        if (/refund|money back|return|chargeback/.test(text)) {
-          reply =
-            `It appears this is a refund-related issue.\n\nRecommended steps:
-1) Clearly request a refund with reasons and evidence.
-2) Allow 48–72 hours for response.
-3) If unresolved, escalate to platform support with screenshots and order ID.`;
-        } else if (/late|delay|deadline|delivery/.test(text)) {
-          reply =
-            `This seems to be a delivery delay issue.\n\nRecommended steps:
-1) Ask for a revised delivery timeline.
-2) Offer a short extension if acceptable.
-3) If unmet, consider cancelling and requesting a refund.`;
-        } else if (/quality|poor|revision|fix/.test(text)) {
-          reply =
-            `This appears to be a quality concern.\n\nRecommended steps:
-1) Provide specific feedback.
-2) Request revisions clearly.
-3) Escalate to dispute if the issue persists.`;
-        } else {
-          reply =
-            `Here’s a summary of the situation:\n${recentMessages.slice(-800)}\n\nSuggested next steps:
-- Clarify expectations
-- Share evidence
-- Escalate if unresolved`;
-        }
+      // 4. Save and Update (Rest of the code is same)
+      order.disputeRisk = riskScore;
+      if (riskScore > 0.7) {
+        order.isFlaggedForReview = true;
+        reply += "\n\n[SYSTEM] 🛡️ Case Flagged for Human Review.";
       }
+      await order.save();
 
       /* ============ SAVE BOT MESSAGE ============ */
-      let botUser = await User.findOne({ email: 'dispute-bot@local' });
+      let botUser = await User.findOne({ email: "dispute-bot@local" });
       if (!botUser) {
         botUser = new User({
-          email: 'dispute-bot@local',
-          username: 'Dispute Bot',
-          password: 'bot',
-          joined_date: new Date().toISOString(),
-          is_active: true
+          email: "dispute-bot@local",
+          username: "Dispute Bot",
+          is_active: true,
+          // This generates a clean, professional "DB" avatar automatically
+          profile_picture: "https://ui-avatars.com/api/?name=Dispute+Bot&background=0D8ABC&color=fff"
         });
         await botUser.save();
       }
@@ -189,23 +191,23 @@ Give short, practical advice. Be neutral and professional.`;
       let botMessage = new Message({
         sender: botUser._id,
         body: reply,
-        date: Date.now(),
-        conversation: conversation._id
+        date: new Date(),
+        conversation: conversation._id,
       });
 
-      botMessage = await botMessage.save();
+      await botMessage.save();
       conversation.messages.push(botMessage._id);
       await conversation.save();
 
-      botMessage = await botMessage.populate('sender', 'username profile_picture');
+      const populatedBotMsg = await botMessage.populate("sender", "username profile_picture");
 
       pubsub.publish(conversation._id.toString(), {
-        messageSent: { ...botMessage._doc, _id: botMessage._id }
+        messageSent: populatedBotMsg,
       });
 
-      return { ...botMessage._doc, _id: botMessage._id };
-    }
-  }
+      return populatedBotMsg;
+    },
+  },
 };
 
 export default ChatResolver;
