@@ -2,29 +2,37 @@ import Service from '../../models/service.js';
 import User from '../../models/user.js';
 import Category from '../../models/category.js';
 import Review from '../../models/review.js';
-import Order from '../../models/order.js';
 import { v2 as cloudinary } from 'cloudinary';
+
+// --- NLP Helper: Basic Keyword Extraction & weighting ---
+// Removes stop words to focus on "Semantic" keywords
+const extractKeywords = (query) => {
+    if (!query) return "";
+    const stopWords = ["i", "want", "a", "looking", "for", "the", "and", "to", "in", "of", "need"];
+    return query
+        .toLowerCase()
+        .split(' ')
+        .filter(word => !stopWords.includes(word))
+        .join(' ');
+};
 
 const ServicesResolver = {
     Query: {
         services: async () => {
             try {
-                const services = await Service.find().populate('freelancer', 'username profile_picture');
-                return services.map(service => {
-                    return { ...service._doc, _id: service.id };
-                });
-            } catch (err) {
-                throw err;
-            }
+                const services = await Service.find().populate('freelancer', 'username profile_picture freelance_rating');
+                return services.map(service => ({ ...service._doc, _id: service.id }));
+            } catch (err) { throw err; }
         },
         service: async (_parent, { serviceId }) => {
             try {
-                const service = await Service.findById(serviceId).populate('freelancer', 'username profile_picture bio');
+                const service = await Service.findById(serviceId).populate('freelancer', 'username profile_picture bio freelance_rating reviews');
                 return { ...service._doc, _id: service.id };
-            } catch (err) {
-                throw err;
-            }
+            } catch (err) { throw err; }
         },
+        // ... (servicesByUserId, servicesByCategory, servicesByCategoryUrlName remain the same) ...
+
+
         servicesByUserId: async (_parent, { userId }) => {
             try {
                 const services = await Service.find({ freelancer: userId }).populate('freelancer', 'username profile_picture');
@@ -74,59 +82,69 @@ const ServicesResolver = {
                 throw err;
             }
         },
+        
+        // --- THE RECOMMENDATION ENGINE ---
         servicesBySearchQuery: async (_parent, { searchQuery }) => {
+            // server/graphql/resolvers/services.js
             try {
                 const services = await Service.aggregate([
                     {
                         $search: {
-                            "text": {
-                                "query": searchQuery,
-                                "path": ["title", "description"],
-                                "fuzzy": {
-                                    "maxEdits": 2,
-                                    "prefixLength": 3
-                                }
+                            index: "Recommendation",
+                            text: {
+                                query: searchQuery,
+                                path: ["title", "description"],
+                                fuzzy: { maxEdits: 1 }
                             }
                         }
-                    }
+                    },
+                    {
+                        $addFields: {
+                            // This calculates the final ranking score
+                            // Text relevance (score) + Freelancer Rating (weighted)
+                            recommendationScore: { 
+                                $add: [
+                                    { $meta: "searchScore" }, 
+                                    { $multiply: ["$rating", 0.5] } 
+                                ] 
+                            }
+                        }
+                    },
+                    { $lookup: { from: "users", localField: "freelancer", foreignField: "_id", as: "freelancer" } },
+                    { $unwind: "$freelancer" },
+                    { $sort: { recommendationScore: -1 } } // Highest score first
                 ]);
 
-                const servicesWithFreelancer = await Service.populate(services, { path: "freelancer", select: "username profile_picture" });
-
-                return servicesWithFreelancer;
-
-                // return services;
+                // MongoDB Aggregate returns plain objects, we need to map _id
+                return services.map(s => ({
+                    ...s,
+                    _id: s._id.toString(),
+                    // Ensure these fields exist so Rating.js doesn't get 'undefined'
+                    rating: s.rating || 0,
+                    reviews: s.reviews || [],
+                    recommendationScore: s.recommendationScore || 0
+                }));
             } catch (err) {
-                throw err;
-            }
-        }
+        console.error(err);
+        throw err;
+    }
+} 
     },
+    // ... Mutation remains the same ...
     Mutation: {
         createService: async (_parent, { service }, context) => {
-
-            if(!context.isAuth) {
-                throw new Error("Unauthenticated");
-            }
-
-            const user = await User.findById(context.userId);
-            const newService = new Service({
-                title: service.title,
-                description: service.description,
-                category: service.category,
-                price: service.price,
-                images: service.images,
-                freelancer: user,
-            });
-            try {
-                const result = await newService.save();
-                console.log(result);
-                return result;
-            } catch (err) {
-                console.log(err);
-                throw err;
-            }
+             // ... existing createService code ...
+             if(!context.isAuth) throw new Error("Unauthenticated");
+             const user = await User.findById(context.userId);
+             const newService = new Service({
+                 ...service,
+                 freelancer: user
+             });
+             return await newService.save();
         },
         updateService: async (_parent, { serviceId, service, newImages }, context) => {
+             // ... existing updateService code ...
+             // (Keep your existing Cloudinary logic here)
             if (!context.isAuth) {
                 throw new Error("Unauthenticated");
             }
@@ -244,7 +262,8 @@ const ServicesResolver = {
             }
         },
         deleteService: async (_parent, { serviceId }, context) => {
-            if (!context.isAuth) {
+             // ... existing deleteService code ...
+             if (!context.isAuth) {
                 throw new Error("Unauthenticated");
             }
 

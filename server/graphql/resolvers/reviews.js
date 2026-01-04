@@ -132,32 +132,26 @@ const ReviewsResolver = {
                 }
 
                 // ---- Update user rating (freelance_rating or client_rating) ----
-                const user = await User.findById(review.reviewee);
-
-                if (user) {
-                    // For order-based reviews, distinguish between freelancer/client roles
-                    const allReviews = await Review.find({ reviewee: review.reviewee }).populate('order');
-                    const relevantReviews = allReviews.filter(r => r.order && r.order.freelancer.toString() === r.reviewee.toString());
-                    const ratings = relevantReviews.map(r => r.rating);
-                    const averageRating =
-                        ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
-
-                    if (order && order.freelancer.toString() === review.reviewee.toString()) {
-                        user.freelance_rating = averageRating;
+                // UPDATE FREELANCER RATING (For Recommendation Engine)
+                const targetUser = await User.findById(review.reviewee);
+                if (targetUser) {
+                    const allReviews = await Review.find({ reviewee: review.reviewee });
+                    const avg = allReviews.reduce((acc, item) => acc + item.rating, 0) / allReviews.length;
+                    
+                    if (order.freelancer.toString() === review.reviewee.toString()) {
+                        targetUser.freelance_rating = avg;
                     } else {
-                        user.client_rating = averageRating;
+                        targetUser.client_rating = avg;
                     }
-
-                    await user.save();
+                    await targetUser.save();
                 }
 
-                // ---- Attach review reference back to the order (client_review / freelancer_review) ----
-                if (isClient) {
+                // Link review back to order
+                if (order.client.toString() === context.userId.toString()) {
                     order.client_review = savedReview._id;
-                } else if (isFreelancer) {
+                } else {
                     order.freelancer_review = savedReview._id;
                 }
-
                 await order.save();
 
                 return savedReview;

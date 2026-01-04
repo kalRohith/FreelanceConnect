@@ -37,6 +37,16 @@ const orderSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Review'
     },
+    // NEW FIELDS FOR AI DISPUTE HANDLER
+    disputeRisk: {
+        type: Number,
+        default: 0
+    },
+    isFlaggedForReview: {
+        type: Boolean,
+        default: false
+    },
+    aiAnalysisNote: String
 });
 
 export default model('Order', orderSchema);
