@@ -47,10 +47,15 @@ type Mutation {
   payOrder(orderId: ID!): Order,
   updateOrderStatus(orderId: ID!, status: String!): Order,
   markNotificationRead(notificationId: ID!): Notification,
+<<<<<<< HEAD
   initiatePayment(orderId: ID!, paymentMethod: PaymentMethodInput!): PaymentResult!,
   releaseEscrow(orderId: ID!): PaymentResult!,
   refundEscrow(orderId: ID!): PaymentResult!,
   createCheckoutSession(serviceId: ID!): String
+=======
+  createCheckoutSession(serviceId: ID!): String
+  
+>>>>>>> modified-UI-Chatbot
 },
 
 type Subscription {
