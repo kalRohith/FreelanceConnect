@@ -43,10 +43,12 @@ const GET_ORDER = gql`
             transaction {
                 _id
                 status
+                escrow_status
                 type
                 amount
                 date
                 description
+                payment_intent_id
             }
         }
     }
@@ -116,6 +118,40 @@ const PAY_ORDER = gql`
             transaction {
                 _id
                 status
+            }
+        }
+    }
+`;
+
+const RELEASE_ESCROW = gql`
+    mutation ReleaseEscrow($orderId: ID!) {
+        releaseEscrow(orderId: $orderId) {
+            success
+            message
+            order {
+                _id
+                status
+                transaction {
+                    _id
+                    escrow_status
+                }
+            }
+        }
+    }
+`;
+
+const REFUND_ESCROW = gql`
+    mutation RefundEscrow($orderId: ID!) {
+        refundEscrow(orderId: $orderId) {
+            success
+            message
+            order {
+                _id
+                status
+                transaction {
+                    _id
+                    escrow_status
+                }
             }
         }
     }
@@ -298,7 +334,7 @@ function GetOrderStatus({ status }) {
     }
 }
 
-function GetOrderActions({ status, updateOrderStatus, orderId, isOrderFreelancer, transactionStatus, isClient, onPay }) {
+function GetOrderActions({ status, updateOrderStatus, orderId, isOrderFreelancer, transactionStatus, isClient, onPay, data, releaseEscrow, refundEscrow, refetch }) {
 
     const isFreelancer = isOrderFreelancer === true || isOrderFreelancer === 'true';
 
@@ -356,36 +392,81 @@ function GetOrderActions({ status, updateOrderStatus, orderId, isOrderFreelancer
         switch (status) {
             case 'pending':
             case 'in_progress':
+                const escrowStatus = data?.orderById?.transaction?.escrow_status;
+                const canRefund = escrowStatus === 'HELD';
                 return (
                     <div className='order__actions row'>
-                        <button
-                            onClick={() => {
-                                updateOrderStatus({ variables: { orderId: orderId, status: 'CANCELLED' } })
-                                    .then(() => {
-                                        window.location.reload();
-                                    });
-                            }}
-                            className='order__button cancel-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Cancel</button>
+                        {canRefund && (
+                            <button
+                                onClick={async () => {
+                                    if (window.confirm('Are you sure you want to cancel and refund? The order will be cancelled and funds will be refunded.')) {
+                                        try {
+                                            await refundEscrow({ variables: { orderId } });
+                                            await updateOrderStatus({ variables: { orderId, status: 'CANCELLED' } });
+                                            refetch();
+                                        } catch (err) {
+                                            console.error(err);
+                                            alert('Failed to process refund: ' + err.message);
+                                        }
+                                    }
+                                }}
+                                className='order__button cancel-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>
+                                Cancel & Refund
+                            </button>
+                        )}
+                        {!canRefund && (
+                            <button
+                                onClick={() => {
+                                    updateOrderStatus({ variables: { orderId: orderId, status: 'CANCELLED' } })
+                                        .then(() => {
+                                            window.location.reload();
+                                        });
+                                }}
+                                className='order__button cancel-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Cancel</button>
+                        )}
                     </div>
                 );
             case 'completed':
-                // show Pay button to client if transaction not completed
+                // show Release Escrow button to client if funds are in escrow
                 if (isClient) {
-                    // if already paid, show Paid label
-                    if (transactionStatus && transactionStatus.toLowerCase() === 'completed') {
+                    // Check escrow status
+                    const escrowStatus = data?.orderById?.transaction?.escrow_status;
+                    if (escrowStatus === 'HELD') {
+                        return (
+                            <div className='order__actions row'>
+                                <button
+                                    onClick={async () => {
+                                        if (window.confirm('Release escrow and transfer funds to freelancer?')) {
+                                            try {
+                                                await releaseEscrow({ variables: { orderId } });
+                                                refetch();
+                                            } catch (err) {
+                                                console.error(err);
+                                                alert('Failed to release escrow: ' + err.message);
+                                            }
+                                        }
+                                    }}
+                                    className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>
+                                    Release Escrow
+                                </button>
+                            </div>
+                        );
+                    } else if (escrowStatus === 'RELEASED' || transactionStatus?.toLowerCase() === 'completed') {
                         return (
                             <div className='order__actions row'>
                                 <div className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Paid</div>
                             </div>
                         );
+                    } else if (!escrowStatus || escrowStatus === 'PENDING') {
+                        // Fallback to old pay button if no escrow
+                        return (
+                            <div className='order__actions row'>
+                                <button
+                                    onClick={() => { if (onPay) onPay(orderId); }}
+                                    className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Pay</button>
+                            </div>
+                        );
                     }
-                    return (
-                        <div className='order__actions row'>
-                            <button
-                                onClick={() => { if (onPay) onPay(orderId); }}
-                                className='order__button complete-order__button col-xs-12 col-sm-12 col-md-4 col-lg-4'>Pay</button>
-                        </div>
-                    );
                 }
                 return (
                     <div className='order__actions row'>
@@ -448,6 +529,8 @@ function Order() {
 
     const [askDisputeBot] = useMutation(ASK_DISPUTE_BOT);
     const [payOrder] = useMutation(PAY_ORDER);
+    const [releaseEscrow] = useMutation(RELEASE_ESCROW);
+    const [refundEscrow] = useMutation(REFUND_ESCROW);
 
     // if (dataConversation)
     //     console.log(dataConversation.conversationByOrderId.messages);
@@ -518,14 +601,29 @@ function Order() {
                                         }</p>
                                     </div>
                                     {data.orderById.transaction && (
-                                        <div className='order__body__details__item'>
-                                            <p className='order__body__details__item__title'>Payment Status</p>
-                                            <p className='order__body__details__item__content'>
-                                                <span className={`payment-status payment-status--${data.orderById.transaction.status.toLowerCase()}`}>
-                                                    {data.orderById.transaction.status}
-                                                </span>
-                                            </p>
-                                        </div>
+                                        <>
+                                            <div className='order__body__details__item'>
+                                                <p className='order__body__details__item__title'>Payment Status</p>
+                                                <p className='order__body__details__item__content'>
+                                                    <span className={`payment-status payment-status--${data.orderById.transaction.status.toLowerCase()}`}>
+                                                        {data.orderById.transaction.status}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            {data.orderById.transaction.escrow_status && (
+                                                <div className='order__body__details__item'>
+                                                    <p className='order__body__details__item__title'>Escrow Status</p>
+                                                    <p className='order__body__details__item__content'>
+                                                        <span className={`escrow-status escrow-status--${data.orderById.transaction.escrow_status.toLowerCase()}`}>
+                                                            {data.orderById.transaction.escrow_status === 'HELD' && '🔒 Funds in Escrow'}
+                                                            {data.orderById.transaction.escrow_status === 'RELEASED' && '✅ Funds Released'}
+                                                            {data.orderById.transaction.escrow_status === 'REFUNDED' && '↩️ Funds Refunded'}
+                                                            {data.orderById.transaction.escrow_status === 'PENDING' && '⏳ Payment Pending'}
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                     {data.orderById.description && (
                                         <div className='order__body__details__item'>
@@ -555,6 +653,10 @@ function Order() {
                                     isOrderFreelancer={userId === data.orderById.freelancer._id}
                                     transactionStatus={data.orderById.transaction?.status}
                                     isClient={userId === data.orderById.client._id}
+                                    data={data}
+                                    releaseEscrow={releaseEscrow}
+                                    refundEscrow={refundEscrow}
+                                    refetch={refetch}
                                     onPay={async (orderIdParam) => {
                                         try {
                                             await payOrder({ variables: { orderId: orderIdParam } });

@@ -67,14 +67,33 @@ const server = new ApolloServer({
 
 
 
-connect(`mongodb+srv://
-${process.env.MONGO_ATLAS_USER}:${encodeURIComponent(process.env.MONGO_ATLAS_PW)}
-@cluster0.34kjrrx.mongodb.net/${process.env.MONGO_ATLAS_DB}?retryWrites=true&w=majority`)
+// MongoDB Connection
+const mongoUser = process.env.MONGO_ATLAS_USER;
+const mongoPassword = process.env.MONGO_ATLAS_PW;
+const mongoDb = process.env.MONGO_ATLAS_DB;
+
+if (!mongoUser || !mongoPassword || !mongoDb) {
+  console.error('❌ MongoDB credentials are missing! Please check your .env file.');
+  process.exit(1);
+}
+
+const mongoUri = `mongodb+srv://${mongoUser}:${encodeURIComponent(mongoPassword)}@freelanceconnect.nblezz6.mongodb.net/${mongoDb}?appName=FreelanceConnect&retryWrites=true&w=majority`;
+
+connect(mongoUri, {
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+})
   .then(() => {
-    console.log('Connected to the database');
+    console.log('✅ Connected to MongoDB Atlas successfully!');
+    console.log(`📊 Database: ${mongoDb}`);
   })
   .catch((err) => {
-    console.log(err);
+    console.error('❌ MongoDB connection error:');
+    console.error('Error details:', err.message);
+    if (err.message.includes('authentication failed')) {
+      console.error('💡 Tip: Check your MongoDB Atlas username and password in .env file');
+      console.error('💡 Tip: Ensure your IP address is whitelisted in MongoDB Atlas Network Access');
+    }
   });
 
 const corsOptions = {
