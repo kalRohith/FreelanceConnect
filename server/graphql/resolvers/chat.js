@@ -112,14 +112,14 @@ const ChatResolver = {
         .join("\n");
 
       // Default strings
-      let reply = "I am reviewing the case details."; 
+      let reply = "I am reviewing the case details.";
       let riskScore = 0.5;
 
       // 3. AI Logic
       if (process.env.GEMINI_API_KEY) {
         console.log("Attempting to contact Gemini AI...");
         try {
-          const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+          const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
           const systemPrompt = `You are a neutral Dispute Resolution Assistant.
           Analyze the context and the user's question.
@@ -131,40 +131,51 @@ const ChatResolver = {
           const prompt = `Context:\n${recentMessages}\n\nUser Question: ${question}`;
 
           const resp = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `${systemPrompt}\n\n${prompt}` }] }],
-              generationConfig: { response_mime_type: "application/json" }
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    { text: systemPrompt + "\n" + prompt }
+                  ]
+                }
+              ]
             })
           });
 
           const data = await resp.json();
-          
-          if (data.error) {
-             console.error("Gemini API Error:", data.error.message);
-             throw new Error("API_ERROR");
+
+          if (!resp.ok || data.error) {
+            console.error("Gemini API Error:", data.error || data);
+            throw new Error("API_ERROR");
           }
 
-          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          const jsonString = extractJSON(rawText); 
+          const rawText =
+            data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+          if (!rawText) throw new Error("EMPTY_RESPONSE");
+
+          const jsonString = extractJSON(rawText);
           const aiResult = JSON.parse(jsonString);
-          
+
           reply = aiResult.reply;
-          riskScore = aiResult.riskScore;
+          riskScore = Number(aiResult.riskScore) || 0.5;
+
           console.log("✅ AI Success. Risk Score:", riskScore);
 
         } catch (err) {
           console.warn("⚠️ AI Failed, using manual fallback. Reason:", err.message);
-          
+
           // MANUAL FALLBACK
           riskScore = calculateManualRisk(recentMessages + " " + question);
-          reply = riskScore > 0.7 
-            ? "I detect high tension in this dispute. I have flagged this for immediate human review." 
+          reply = riskScore > 0.7
+            ? "I detect high tension in this dispute. I have flagged this for immediate human review."
             : "I am currently running in offline mode. Please contact support if you need urgent help.";
         }
       } else {
-         console.error("❌ SKIPPING AI: No API Key found in process.env");
+        console.error("❌ SKIPPING AI: No API Key found in process.env");
       }
 
       // 4. Save and Update (Rest of the code is same)
